@@ -45,7 +45,15 @@ function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack}){
         <div className="brand-mark"><span>iR</span></div>
         <div className="brand-text">
           <b>iRUN<span style={{color:'var(--cyan)'}}>·</span>WORKBENCH</b>
-          <small>数字运维指挥中心 · <em>v1.2.6</em></small>
+          <div className="brand-tenant">
+            <span className="bt-lbl">租户</span>
+            <select value={tenantIdx} onChange={e=>onTenant(Number(e.target.value))}>
+              {_TENANTS.map((t,i)=>(
+                <option key={t.id} value={i}>{t.name}</option>
+              ))}
+            </select>
+            <span className="bt-arrow">▼</span>
+          </div>
         </div>
       </div>
 
@@ -91,15 +99,6 @@ function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack}){
       </div>
 
       <div className="right">
-        <div className="tenant-pill">
-          <span className="lbl">租户</span>
-          <select value={tenantIdx} onChange={e=>onTenant(Number(e.target.value))}>
-            {_TENANTS.map((t,i)=>(
-              <option key={t.id} value={i}>{t.name}</option>
-            ))}
-          </select>
-          <span className="arrow">▼</span>
-        </div>
         <div className="live-wrap">
           <div className="live-time">
             <span className="dt">{fmtDate(clock)}</span>
@@ -327,7 +326,7 @@ function AgentDock({focusPlant, busyMap, onOpen}){
                  onClick={()=>onOpen(a.id)}>
               <div className="cat-strip"/>
               <div className="top">
-                <div className="code">{a.code}</div>
+                <div style={{flexShrink:0}}><RobotAvatar agent={a} size={28} glow={busy}/></div>
                 <div>
                   <div className="nm">{a.name}</div>
                   <div className="rl">{a.role}</div>
