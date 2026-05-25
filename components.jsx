@@ -519,7 +519,31 @@ function AgentModal({agentId, onClose, busyMap}){
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, useClock, fmtTime, fmtDate };
+// ──────────────────────────────────────────────────────────────────────
+// View mode strip — vertical buttons on far left
+function ModeStrip({mode, onChange}){
+  const modes = [
+    {id:'map',   ic:'🗺', lb:'地图模式'},
+    {id:'model', ic:'⬢',  lb:'模型模式'},
+    {id:'day',   ic:'☀',  lb:'日间模式'},
+    {id:'night', ic:'🌙', lb:'夜间模式'},
+  ];
+  return (
+    <div className="mode-strip">
+      {modes.map(m=>(
+        <div key={m.id}
+             className={`mode-btn ${mode===m.id?'on':''}`}
+             onClick={()=>onChange(m.id)}
+             title={m.lb}>
+          <span className="ic">{m.ic}</span>
+          <span className="lb">{m.lb}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, useClock, fmtTime, fmtDate };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left

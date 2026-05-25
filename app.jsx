@@ -1,9 +1,10 @@
 // iRun Workbench — App root
 const { useState: _aUseState, useEffect: _aUseEffect, useCallback: _aUseCallback } = React;
 const useState = _aUseState, useEffect = _aUseEffect, useCallback = _aUseCallback;
-const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, MiniMap, QuickFuncs, AgentModal, AgentsRail } = window.IRUN_UI;
+const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip } = window.IRUN_UI;
 const { PlantsMap } = window.IRUN_MAP;
 const { PlantDetail } = window.IRUN_DETAIL;
+const { Scene3D } = window.IRUN_SCENE3D;
 const { PLANTS: APP_PLANTS, TENANTS: APP_TENANTS, AGENTS: APP_AGENTS, AGENT_BY_ID: APP_ABI } = window.IRUN;
 
 function App(){
@@ -31,6 +32,7 @@ function App(){
   };
   const [tenantIdx, setTenantIdx] = useState(0);
   const tenant = APP_TENANTS[tenantIdx];
+  const [viewMode, setViewMode] = useState('map'); // map | model | day | night
 
   // Scenario state when a plant is open
   const [scenarioIdx, setScenarioIdx] = useState(0);
@@ -113,8 +115,13 @@ function App(){
         <div className="vignette"/>
       </div>
 
-      {/* full-screen plants map (clickable) */}
-      <PlantsMap focusId={focusId} onFocus={setFocusId}/>
+      {/* full-screen plants map OR 3D scene */}
+      {viewMode === 'map'
+        ? <PlantsMap focusId={focusId} onFocus={setFocusId}/>
+        : <Scene3D mode={viewMode}/>}
+
+      {/* view mode strip (always visible, left edge) */}
+      <ModeStrip mode={viewMode} onChange={setViewMode}/>
 
       {/* top KPIs */}
       <TopBar focusPlant={focusPlant} tenant={tenant} tenantIdx={tenantIdx} onTenant={setTenantIdx} onBack={()=>setFocusId(null)}/>
