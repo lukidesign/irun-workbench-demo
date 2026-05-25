@@ -115,14 +115,17 @@ function App(){
         <div className="vignette"/>
       </div>
 
-      {/* full-screen plants map / 3D scene / image background */}
+      {/* full-bleed image background (image modes only) */}
+      {(viewMode === 'img1' || viewMode === 'img2') && (
+        <>
+          <div className="scene-img-bg" style={{backgroundImage:`url('${viewMode==='img1'?'img1.jpg':'img2.jpg'}')`}}/>
+          <div className="scene-img-tag">VIEW · <b>{viewMode==='img1'?'图片模式 1':'图片模式 2'}</b></div>
+        </>
+      )}
+
+      {/* full-screen plants map / 3D scene */}
       {viewMode === 'map' && <PlantsMap focusId={focusId} onFocus={setFocusId}/>}
       {(viewMode === 'model' || viewMode === 'day' || viewMode === 'night') && <Scene3D mode={viewMode}/>}
-      {(viewMode === 'img1' || viewMode === 'img2') && (
-        <div className="img-scene" style={{backgroundImage:`url('${viewMode==='img1'?'img1.jpg':'img2.jpg'}')`}}>
-          <div className="scene-mode-tag">VIEW · <b>{viewMode==='img1'?'图片模式 1':'图片模式 2'}</b></div>
-        </div>
-      )}
 
       {/* view mode strip (always visible, left edge) */}
       <ModeStrip mode={viewMode} onChange={setViewMode}/>
