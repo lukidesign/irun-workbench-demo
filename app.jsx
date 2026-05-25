@@ -119,12 +119,6 @@ function App(){
       {(viewMode === 'img1' || viewMode === 'img2' || viewMode === 'map2') && (
         <div className="scene-img-bg" style={{backgroundImage:`url('${viewMode==='img1'?'img1.jpg':viewMode==='img2'?'img2.jpg':'map2.jpg'}')`}}/>
       )}
-      {(viewMode === 'img1' || viewMode === 'img2') && (
-        <div className="scene-img-tag">VIEW · <b>{viewMode==='img1'?'图片模式 1':'图片模式 2'}</b></div>
-      )}
-      {viewMode === 'map2' && (
-        <div className="scene-img-tag">VIEW · <b>地图模式 2</b></div>
-      )}
 
       {/* full-screen plants map / 3D scene */}
       {viewMode === 'map' && <PlantsMap focusId={focusId} onFocus={setFocusId}/>}
