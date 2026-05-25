@@ -324,7 +324,7 @@ function AgentDock({focusPlant, busyMap, onOpen}){
               </div>
               <div className="meta">
                 <span className={`badge ${statusCls}`}>{isOff?'未启用':status}</span>
-                <span className="tok">{a.metrics.tokens} tok · {a.metrics.todayCalls}</span>
+                <span className="tok" title={`${a.metrics.tokens} tok · ${a.metrics.todayCalls} calls`}>{a.metrics.tokens}k·{a.metrics.todayCalls}</span>
               </div>
             </div>
           );
