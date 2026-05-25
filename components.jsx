@@ -542,7 +542,72 @@ function ModeStrip({mode, onChange}){
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, useClock, fmtTime, fmtDate };
+// ──────────────────────────────────────────────────────────────────────
+// Agent Token Analytics Panel (replaces AgentDock in map2 mode)
+function AgentTokenPanel({ busyMap, onOpen }) {
+  // Deterministic 24-hour sparkline seeded by agent index
+  function genSpark(seed) {
+    const pts = [];
+    for (let h = 0; h < 24; h++) {
+      const base = (h >= 8 && h <= 19)
+        ? 0.3 + 0.65 * Math.sin((h - 8) / 11 * Math.PI)
+        : 0.04;
+      const r = ((seed * 1664525 + h * 1013904223) >>> 0) / 4294967296;
+      pts.push(Math.max(0.04, Math.min(1, base + (r - 0.5) * 0.3)));
+    }
+    return pts;
+  }
+
+  const W = 100, H = 22;
+
+  return (
+    <div className="panel agent-token-panel corners"><span className="c1"/>
+      <div className="panel-hd">
+        <span><span className="dot"/> 智能体算力 · AGENT ANALYTICS</span>
+        <span style={{color:'var(--text-mute)',fontSize:10,letterSpacing:'0.1em'}}>24H TOKEN CURVE</span>
+      </div>
+      <div className="token-grid">
+        {_AGENTS.map((a, i) => {
+          const cat = _CATS[a.cat];
+          const busy = busyMap?.[a.id];
+          const spark = genSpark(i * 31337 + 7);
+          const mx = Math.max(...spark);
+          const peakH = spark.indexOf(mx);
+          const color = busy ? '#22d3ee' : cat.color;
+          const polyPts = spark.map((v, idx) =>
+            `${(idx / 23) * W},${H - 2 - (v / mx) * (H - 5)}`
+          ).join(' ');
+          const areaPts = `0,${H} ${polyPts} ${W},${H}`;
+          return (
+            <div key={a.id}
+                 className={`token-card${busy ? ' busy' : ''}`}
+                 style={{'--cat-color': color}}
+                 onClick={() => onOpen(a.id)}>
+              <div className="tc-top">
+                <RobotAvatar agent={a} size={22} glow={busy}/>
+                <div className="tc-info">
+                  <span className="tc-name">{a.short}</span>
+                  <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{busy ? '● 运行' : '○ 空闲'}</span>
+                </div>
+                <span className="tc-tok">{a.metrics.tokens}</span>
+              </div>
+              <svg className="tc-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+                <polygon points={areaPts} fill={color} fillOpacity="0.13"/>
+                <polyline points={polyPts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>
+              </svg>
+              <div className="tc-foot">
+                <span>{a.metrics.todayCalls} calls</span>
+                <span>峰 {peakH}:00 · {a.metrics.success}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, useClock, fmtTime, fmtDate };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left

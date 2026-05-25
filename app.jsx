@@ -1,7 +1,7 @@
 // iRun Workbench — App root
 const { useState: _aUseState, useEffect: _aUseEffect, useCallback: _aUseCallback } = React;
 const useState = _aUseState, useEffect = _aUseEffect, useCallback = _aUseCallback;
-const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip } = window.IRUN_UI;
+const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip } = window.IRUN_UI;
 const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
 const { PlantDetail } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
@@ -166,7 +166,10 @@ function App(){
       {/* dock */}
       <div className="dock">
         <MiniMap focusPlant={focusPlant} onFocus={setFocusId}/>
-        <AgentDock focusPlant={focusPlant} busyMap={busyMap} onOpen={setOpenAgent}/>
+        {viewMode === 'map2'
+          ? <AgentTokenPanel busyMap={busyMap} onOpen={setOpenAgent}/>
+          : <AgentDock focusPlant={focusPlant} busyMap={busyMap} onOpen={setOpenAgent}/>
+        }
         <QuickFuncs focusPlant={focusPlant} totalTokens={totalTokens} busyCount={busyCount}/>
       </div>
 
