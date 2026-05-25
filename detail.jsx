@@ -33,7 +33,30 @@ function PlantDetail({plant, onClose, scenarioIdx, mode, onModeChange, onScenari
   const scenario = _SCENARIOS[scenarioIdx];
   const [stepIdx, setStepIdx] = useState(0);
   const [played, setPlayed] = useState(new Set([0]));
+  const [showVideo, setShowVideo] = useState(false);
   const timersRef = useRef([]);
+  const detailRef = useRef(null);
+  const videoRef = useRef(null);
+
+  function toggleFullscreen(){
+    const el = detailRef.current;
+    if(!el) return;
+    if(!document.fullscreenElement && !document.webkitFullscreenElement){
+      (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    }
+  }
+
+  function openVideo(){
+    setShowVideo(true);
+    // autoplay after mount
+    setTimeout(()=>{ if(videoRef.current){ videoRef.current.play().catch(()=>{}); } }, 100);
+  }
+  function closeVideo(){
+    if(videoRef.current){ videoRef.current.pause(); videoRef.current.currentTime=0; }
+    setShowVideo(false);
+  }
 
   // Reset and replay whenever scenario or plant changes
   useEffect(()=>{
@@ -71,7 +94,7 @@ function PlantDetail({plant, onClose, scenarioIdx, mode, onModeChange, onScenari
 
   return (
     <div className="detail-overlay">
-      <div className="detail corners" onClick={e=>e.stopPropagation()}>
+      <div className="detail corners" ref={detailRef} onClick={e=>e.stopPropagation()}>
         <span className="c1"/>
         <div className="detail-hd">
           <div className="title">
@@ -86,9 +109,17 @@ function PlantDetail({plant, onClose, scenarioIdx, mode, onModeChange, onScenari
               <button className={mode==='auto'?'on':''} onClick={()=>onModeChange('auto')}>托管模式</button>
               <button className={mode==='command'?'on':''} onClick={()=>onModeChange('command')}>指挥模式</button>
             </div>
+            <button className="detail-btn" onClick={openVideo}>▶ 播放</button>
+            <button className="detail-btn fs" onClick={toggleFullscreen}>⛶ 全屏</button>
             <div className="detail-close" onClick={onClose}>×</div>
           </div>
         </div>
+        {showVideo && (
+          <div className="video-overlay">
+            <div className="v-close" onClick={closeVideo}>×</div>
+            <video ref={videoRef} controls src="video.mp4" style={{maxWidth:'92%',maxHeight:'80%'}}/>
+          </div>
+        )}
 
         <SceneStage plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur} mode={mode}/>
 
