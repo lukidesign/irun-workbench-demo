@@ -591,6 +591,24 @@ body{
 }
 .scene-3d .scene-mode-tag b{color:var(--cyan);font-weight:500}
 
+/* ------ image mode (full-bleed picture as background) ------ */
+.img-scene{
+  position:absolute;top:64px;left:0;right:100px;bottom:220px;
+  pointer-events:auto;background:#04060d center/cover no-repeat;
+  overflow:hidden;
+}
+.img-scene::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 60% at 50% 50%, transparent 50%, rgba(2,5,12,0.55) 100%);
+}
+.img-scene .scene-mode-tag{
+  position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+  font-family:var(--font-mono);font-size:11px;letter-spacing:0.2em;
+  color:var(--text-mute);padding:4px 12px;border:1px solid var(--line);
+  background:rgba(6,10,22,0.7);z-index:2;
+}
+.img-scene .scene-mode-tag b{color:var(--cyan);font-weight:500}
+
 /* ------ map (background) ------ */
 .map-wrap{
   position:absolute;top:64px;left:0;right:100px;bottom:220px;
