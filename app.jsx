@@ -32,7 +32,8 @@ function App(){
   };
   const [tenantIdx, setTenantIdx] = useState(0);
   const tenant = APP_TENANTS[tenantIdx];
-  const [viewMode, setViewMode] = useState('map'); // map | model | day | night
+  const [viewMode, setViewMode] = useState('map'); // map | map2 | img2
+  const [map2SubMode, setMap2SubMode] = useState('show'); // show | roam
 
   // Scenario state when a plant is open
   const [scenarioIdx, setScenarioIdx] = useState(0);
@@ -115,14 +116,29 @@ function App(){
         <div className="vignette"/>
       </div>
 
-      {/* full-bleed image background (image modes + map2) */}
-      {(viewMode === 'img1' || viewMode === 'img2' || viewMode === 'map2') && (
-        <div className="scene-img-bg" style={{backgroundImage:`url('${viewMode==='img1'?'img1.jpg':viewMode==='img2'?'img2.jpg':'map2.jpg'}')`}}/>
+      {/* full-bleed image background (image modes + map2 展示) */}
+      {(viewMode === 'img2') && (
+        <div className="scene-img-bg" style={{backgroundImage:`url('img2.jpg')`}}/>
+      )}
+      {(viewMode === 'map2' && map2SubMode === 'show') && (
+        <div className="scene-img-bg" style={{backgroundImage:`url('map2.jpg')`}}/>
+      )}
+      {/* map2 漫游 — video background */}
+      {(viewMode === 'map2' && map2SubMode === 'roam') && (
+        <video className="scene-video-bg" src="rjgf003.mp4" autoPlay muted loop playsInline/>
       )}
 
       {/* full-screen plants map / 3D scene */}
       {viewMode === 'map' && <PlantsMap focusId={focusId} onFocus={setFocusId}/>}
       {viewMode === 'map2' && <Map2Overlay focusId={focusId} onFocus={setFocusId}/>}
+
+      {/* map2 展示/漫游 toggle */}
+      {viewMode === 'map2' && (
+        <div className="map2-toggle">
+          <button className={`map2-toggle-btn${map2SubMode==='show'?' active':''}`} onClick={()=>setMap2SubMode('show')}>展示</button>
+          <button className={`map2-toggle-btn${map2SubMode==='roam'?' active':''}`} onClick={()=>setMap2SubMode('roam')}>漫游</button>
+        </div>
+      )}
       {(viewMode === 'model' || viewMode === 'day' || viewMode === 'night') && <Scene3D mode={viewMode}/>}
 
       {/* view mode strip (always visible, left edge) */}

@@ -642,6 +642,32 @@ body{
 }
 .scene-img-tag b{color:var(--cyan);font-weight:500}
 
+/* video background */
+.scene-video-bg{
+  position:absolute;inset:0;z-index:1;width:100%;height:100%;
+  object-fit:cover;background:#04060d;
+}
+.scene-video-bg::after{ /* can't use ::after on video, handled via overlay sibling */ }
+
+/* map2 展示/漫游 toggle */
+.map2-toggle{
+  position:absolute;bottom:234px;left:50%;transform:translateX(-50%);
+  z-index:26;display:flex;gap:4px;pointer-events:auto;
+}
+.map2-toggle-btn{
+  font-family:var(--font-mono);font-size:11px;letter-spacing:0.18em;
+  padding:5px 18px;border:1px solid var(--line);cursor:pointer;
+  background:rgba(6,10,22,0.82);color:var(--text-mute);
+  transition:all .15s ease;
+  backdrop-filter:blur(6px);
+}
+.map2-toggle-btn:hover{border-color:var(--cyan);color:#fff}
+.map2-toggle-btn.active{
+  border-color:var(--cyan);color:var(--cyan);
+  background:rgba(34,211,238,0.1);
+  box-shadow:0 0 10px rgba(34,211,238,0.2);
+}
+
 /* ------ map (background) ------ */
 .map-wrap{
   position:absolute;top:64px;left:0;right:100px;bottom:220px;
