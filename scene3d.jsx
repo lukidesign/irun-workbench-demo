@@ -138,10 +138,7 @@ function Scene3D({mode}){
       return grp;
     }
 
-    scene.add(makeBuilding(8, 6, 12, 22, -12, {edge:0x5ad1ff})); // factory
-    scene.add(makeBuilding(6, 4, 6, 22, 4, {edge:0x5ad1ff})); // control room
-    scene.add(makeBuilding(3, 3, 3, -28, 12, {edge:0x4adba2, ring:0x4adba2})); // inverter
-    scene.add(makeBuilding(4, 5, 4, -28, -10, {edge:0xfbbf24, ring:0xfbbf24})); // tower
+    scene.add(makeBuilding(8, 6, 12, 22, -12, {edge:0x5ad1ff})); // factory (only)
 
     // --- flowing energy line (curve)
     const flowMat = new THREE.LineBasicMaterial({color: 0x4adba2, transparent: true, opacity: 0.85});
