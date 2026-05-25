@@ -60,16 +60,16 @@ function PlantsMap({focusId, onFocus}){
           const anchor = labelLeft ? 'end' : 'start';
           return (
             <g key={p.id} className="plant-node" onClick={()=>onFocus(p.id)}>
-              <circle cx={p.x} cy={p.y} r="6" fill={glow}/>
-              <circle cx={p.x} cy={p.y} r="2.4" className="plant-ring" style={{color:colour}}/>
-              <circle cx={p.x} cy={p.y} r="3.4" className="plant-ring r2 plant-pulse" style={{color:colour}}/>
-              <circle cx={p.x} cy={p.y} r="4.6" className="plant-ring r3" style={{color:colour}}/>
-              {focus && <circle cx={p.x} cy={p.y} r="5.6" fill="none" stroke="#22d3ee" strokeWidth="0.18" strokeDasharray="0.6 0.4"/>}
-              <circle cx={p.x} cy={p.y} r="0.9" fill={colour}/>
+              <circle cx={p.x} cy={p.y} r="3" fill={glow}/>
+              <circle cx={p.x} cy={p.y} r="1.2" className="plant-ring" style={{color:colour}}/>
+              <circle cx={p.x} cy={p.y} r="1.7" className="plant-ring r2 plant-pulse" style={{color:colour}}/>
+              <circle cx={p.x} cy={p.y} r="2.3" className="plant-ring r3" style={{color:colour}}/>
+              {focus && <circle cx={p.x} cy={p.y} r="2.8" fill="none" stroke="#22d3ee" strokeWidth="0.18" strokeDasharray="0.6 0.4"/>}
+              <circle cx={p.x} cy={p.y} r="0.45" fill={colour}/>
               <line x1={tickX1} y1={p.y} x2={tickX2} y2={p.y} stroke={colour} strokeWidth="0.1" strokeDasharray="0.3 0.3"/>
               <text className="plant-label" x={lblX} y={p.y-0.4} textAnchor={anchor} style={{fontSize:1.3}}>{p.name}</text>
-              <text className="plant-sub" x={lblX} y={p.y+1.1} textAnchor={anchor} style={{fontSize:0.95}}>{p.region} · {p.capacity}MW</text>
-              <text className="plant-sub" x={lblX} y={p.y+2.2} textAnchor={anchor} style={{fontSize:0.9, fill: p.alerts>0?'#fbbf24':'#5a6a87'}}>
+              <text className="plant-sub" x={lblX} y={p.y+1.1} textAnchor={anchor} style={{fontSize:0.95, fill:'rgba(220,235,255,0.85)'}}>{p.region} · {p.capacity}MW</text>
+              <text className="plant-sub" x={lblX} y={p.y+2.2} textAnchor={anchor} style={{fontSize:0.9, fill: p.alerts>0?'#fbbf24':'rgba(200,220,255,0.75)'}}>
                 {p.status} · 告警 {p.alerts}
               </text>
             </g>
