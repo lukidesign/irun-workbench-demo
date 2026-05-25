@@ -252,8 +252,11 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
         </div>
       )}
 
-      {/* scenario log */}
-      <SceneLog scenario={scenario} steps={visibleSteps}/>
+      {/* digital team roster */}
+      <DigitalTeam plant={plant} activeAgentIds={activeAgentIds}/>
+
+      {/* scenario log — positioned below team panel dynamically */}
+      <SceneLog scenario={scenario} steps={visibleSteps} plant={plant}/>
 
       {/* token strip */}
       <TokenStrip plant={plant} stepIdx={stepIdx}/>
@@ -269,13 +272,53 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
   );
 }
 
-function SceneLog({scenario, steps}){
+// ── Digital Team roster panel (left, top)
+function DigitalTeam({plant, activeAgentIds}){
+  const ALL_IDS = ['ops','warn','alert','diag','safe','order','sched','pv','insp','query'];
+  return (
+    <div className="team-panel">
+      <h4>
+        <span>数字团队</span>
+        <span className="cnt">{plant.agents.length} / {ALL_IDS.length} 配备</span>
+      </h4>
+      <div className="team-list">
+        {ALL_IDS.map(id=>{
+          const ag = _D_ABI[id];
+          if(!ag) return null;
+          const cat = _D_CAT[ag.cat];
+          const assigned = plant.agents.includes(id);
+          const isActive = activeAgentIds.has(id);
+          const hasAlert = ag.notif > 0;
+          const statusLabel = !assigned ? '未配备' : isActive ? '工作中' : hasAlert ? '待处理' : '就绪';
+          const statusCls = !assigned ? '' : isActive ? 'work' : hasAlert ? 'alert' : '';
+          return (
+            <div key={id} className={`team-row${assigned?'':' absent'}`}
+                 style={{'--cat-c': cat.color}}>
+              <div className="tc">{ag.code}</div>
+              <div className="ti">
+                <div className="tn">{ag.name}</div>
+                <div className="tr">{ag.role}</div>
+              </div>
+              <div className={`ts ${statusCls}`}>{statusLabel}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SceneLog({scenario, steps, plant}){
   const ref = useRef(null);
+  // team-panel height: header(38) + 10 rows*(10 agents, ~38px each) but capped
+  const teamRows = 10; // always render all 10 agent slots
+  const teamH = 38 + teamRows * 38; // ~418px
+  const topOffset = 14 + teamH + 10; // team top(14) + height + gap
   useEffect(()=>{
     if(ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   },[steps.length]);
   return (
-    <div className="scene-log">
+    <div className="scene-log" style={{top: topOffset+'px'}}>
       <h4>
         <span>多 Agent 协同日志</span>
         <span className="badge">{scenario.id} · {steps.length}/{scenario.steps.length}</span>
