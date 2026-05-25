@@ -265,15 +265,33 @@ body{
   display:flex;align-items:center;gap:14px;padding:0 18px;border-left:1px solid var(--line);
 }
 .tenant-pill{
-  display:flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);
-  font-size:11px;color:var(--text-dim);letter-spacing:0.1em;
+  display:flex;align-items:center;gap:8px;padding:4px 10px 4px 12px;border:1px solid var(--line);
+  font-size:11px;color:var(--text-dim);letter-spacing:0.1em;cursor:pointer;position:relative;
 }
-.tenant-pill b{color:#fff;font-weight:500}
-.live{
-  display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.15em;
+.tenant-pill .lbl{font-size:9.5px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-mute)}
+.tenant-pill select{
+  background:transparent;border:0;outline:none;color:#fff;font-family:var(--font-display);
+  font-size:12px;font-weight:500;letter-spacing:0.06em;cursor:pointer;
+  appearance:none;-webkit-appearance:none;padding-right:16px;min-width:140px;
 }
-.live::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--cyan);
-  box-shadow:0 0 8px var(--cyan);animation:pulse 1.6s ease-in-out infinite}
+.tenant-pill select option{background:#0a1020;color:#fff}
+.tenant-pill .arrow{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  color:var(--cyan);font-size:8px;pointer-events:none;line-height:1;
+}
+.live-wrap{
+  display:flex;align-items:center;gap:8px;
+}
+.live-wrap::before{
+  content:"";flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--cyan);
+  box-shadow:0 0 8px var(--cyan);animation:pulse 1.6s ease-in-out infinite;
+}
+.live-time{
+  display:flex;flex-direction:column;align-items:flex-end;gap:1px;
+  font-family:var(--font-mono);letter-spacing:0.12em;color:var(--cyan);
+}
+.live-time .dt{font-size:10px;opacity:0.75}
+.live-time .tm{font-size:12px;font-weight:500}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
 
 /* ------ stage ------ */

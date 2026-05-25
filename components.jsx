@@ -23,12 +23,12 @@ function fmtTime(d){
 }
 function fmtDate(d){
   const p = n => String(n).padStart(2,'0');
-  return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())}`;
+  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())}`;
 }
 
 // ──────────────────────────────────────────────────────────────────────
 // Top bar
-function TopBar({focusPlant, tenant, onTenant, onBack}){
+function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack}){
   const clock = useClock();
   const k = focusPlant ? {
     cap: focusPlant.capacity, pwr: focusPlant.power, gen: focusPlant.gen, al: focusPlant.alerts,
@@ -92,9 +92,20 @@ function TopBar({focusPlant, tenant, onTenant, onBack}){
 
       <div className="right">
         <div className="tenant-pill">
-          租户 · <b>{tenant.name}</b>
+          <span className="lbl">租户</span>
+          <select value={tenantIdx} onChange={e=>onTenant(Number(e.target.value))}>
+            {_TENANTS.map((t,i)=>(
+              <option key={t.id} value={i}>{t.name}</option>
+            ))}
+          </select>
+          <span className="arrow">▼</span>
         </div>
-        <div className="live">{fmtDate(clock)} · {fmtTime(clock)}</div>
+        <div className="live-wrap">
+          <div className="live-time">
+            <span className="dt">{fmtDate(clock)}</span>
+            <span className="tm">{fmtTime(clock)}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

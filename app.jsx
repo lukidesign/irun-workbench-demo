@@ -29,7 +29,7 @@ function App(){
     setStreamCollapsed(v);
     try { localStorage.setItem('irun:stream-collapsed', v?'1':'0'); } catch(e){}
   };
-  const [tenantIdx] = useState(0);
+  const [tenantIdx, setTenantIdx] = useState(0);
   const tenant = APP_TENANTS[tenantIdx];
 
   // Scenario state when a plant is open
@@ -117,7 +117,7 @@ function App(){
       <PlantsMap focusId={focusId} onFocus={setFocusId}/>
 
       {/* top KPIs */}
-      <TopBar focusPlant={focusPlant} tenant={tenant} onBack={()=>setFocusId(null)}/>
+      <TopBar focusPlant={focusPlant} tenant={tenant} tenantIdx={tenantIdx} onTenant={setTenantIdx} onBack={()=>setFocusId(null)}/>
 
       {/* left + right rails over map */}
       <div className="stage">
