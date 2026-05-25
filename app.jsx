@@ -166,10 +166,7 @@ function App(){
       {/* dock */}
       <div className="dock">
         <MiniMap focusPlant={focusPlant} onFocus={setFocusId}/>
-        {viewMode === 'map2'
-          ? <AgentTokenPanel busyMap={busyMap} onOpen={setOpenAgent}/>
-          : <AgentDock focusPlant={focusPlant} busyMap={busyMap} onOpen={setOpenAgent}/>
-        }
+        <AgentTokenPanel busyMap={busyMap} onOpen={setOpenAgent}/>
         <QuickFuncs focusPlant={focusPlant} totalTokens={totalTokens} busyCount={busyCount}/>
       </div>
 
