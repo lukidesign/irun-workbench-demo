@@ -88,4 +88,51 @@ function PlantsMap({focusId, onFocus}){
   );
 }
 
-window.IRUN_MAP = { PlantsMap };
+// Map2Overlay — floating plant pins for map2 (city background) mode
+// Positions are % of full 1920×1080 workbench canvas
+const MAP2_PINS = [
+  { id: 'p7', x: '12%',  y: '40%' },   // left solar field
+  { id: 'p3', x: '27%',  y: '55%' },   // center-left lower
+  { id: 'p1', x: '37%',  y: '55%' },   // center lower
+  { id: 'p5', x: '42%',  y: '37%' },   // center-upper building
+  { id: 'p2', x: '58%',  y: '42%' },   // center-right upper
+  { id: 'p6', x: '75%',  y: '53%' },   // right lower
+  { id: 'p4', x: '85%',  y: '40%' },   // far right
+];
+
+function Map2Overlay({ focusId, onFocus }) {
+  return (
+    <div className="map2-overlay">
+      {MAP2_PINS.map((pos, i) => {
+        const plant = _MAP_PLANTS.find(p => p.id === pos.id);
+        if (!plant) return null;
+        const colour = plant.risk==='high' ? '#f87171' : plant.risk==='mid' ? '#fbbf24' : '#22d3ee';
+        const statusLabel = plant.risk==='high' ? '⚠ 高风险' : plant.risk==='mid' ? '△ 关注' : '✓ 正常';
+        return (
+          <div
+            key={plant.id}
+            className={`map2-pin${focusId===plant.id ? ' active' : ''}`}
+            style={{
+              left: pos.x, top: pos.y,
+              '--pin-color': colour,
+              animationDelay: `${i * 0.45}s`
+            }}
+            onClick={() => onFocus(plant.id)}
+          >
+            <div className="map2-pin-label">
+              <span className="map2-pin-name">{plant.short}</span>
+              <span className="map2-pin-meta">{plant.power}MW · {statusLabel}</span>
+            </div>
+            <div className="map2-pin-line"/>
+            <div className="map2-pin-dot">
+              <div className="map2-pin-ring"/>
+              <div className="map2-pin-ring2"/>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+window.IRUN_MAP = { PlantsMap, Map2Overlay };

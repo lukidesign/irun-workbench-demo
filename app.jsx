@@ -2,7 +2,7 @@
 const { useState: _aUseState, useEffect: _aUseEffect, useCallback: _aUseCallback } = React;
 const useState = _aUseState, useEffect = _aUseEffect, useCallback = _aUseCallback;
 const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip } = window.IRUN_UI;
-const { PlantsMap } = window.IRUN_MAP;
+const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
 const { PlantDetail } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
 const { PLANTS: APP_PLANTS, TENANTS: APP_TENANTS, AGENTS: APP_AGENTS, AGENT_BY_ID: APP_ABI } = window.IRUN;
@@ -127,7 +127,8 @@ function App(){
       )}
 
       {/* full-screen plants map / 3D scene */}
-      {(viewMode === 'map' || viewMode === 'map2') && <PlantsMap focusId={focusId} onFocus={setFocusId}/>}
+      {viewMode === 'map' && <PlantsMap focusId={focusId} onFocus={setFocusId}/>}
+      {viewMode === 'map2' && <Map2Overlay focusId={focusId} onFocus={setFocusId}/>}
       {(viewMode === 'model' || viewMode === 'day' || viewMode === 'night') && <Scene3D mode={viewMode}/>}
 
       {/* view mode strip (always visible, left edge) */}
@@ -161,13 +162,6 @@ function App(){
         onSelect={setSelectedAgent}
         onOpen={setOpenAgent}/>
 
-      {/* status strip */}
-      <div className="status-strip">
-        <span>SESSION · <b>{tenant.id.toUpperCase()}-LIVE-{Date.now().toString(36).slice(-5).toUpperCase()}</b></span>
-        <span>NODE · <b>iRun-Cluster-03</b></span>
-        <span>SYNC · <b>稳定</b></span>
-        <span>LATENCY · <b>132ms</b></span>
-      </div>
 
       {/* dock */}
       <div className="dock">

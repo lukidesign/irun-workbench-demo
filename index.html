@@ -320,7 +320,7 @@ body{
 /* ------ stage ------ */
 .stage{
   position:absolute;top:64px;left:0;right:100px;bottom:220px;display:flex;gap:14px;padding:14px 14px 14px 70px;
-  pointer-events:none; /* let map below receive clicks */
+  pointer-events:none;z-index:24; /* above scene-img-bg(z:1) */
 }
 .stage > *{pointer-events:auto}
 .left-rail{width:340px;display:flex;flex-direction:column;gap:14px;transition:width .25s ease}
@@ -631,6 +631,65 @@ body{
 .plant-ring.r3{stroke-opacity:0.25}
 .plant-pulse{animation:plant-pulse 2.6s ease-in-out infinite}
 @keyframes plant-pulse{0%,100%{opacity:0.25}50%{opacity:0.85}}
+
+/* ------ map2 floating pins overlay ------ */
+.map2-overlay{
+  position:absolute;inset:0;pointer-events:none;z-index:5;
+}
+.map2-pin{
+  position:absolute;pointer-events:auto;cursor:pointer;
+  transform:translate(-50%,-100%);
+  display:flex;flex-direction:column;align-items:center;
+  animation:pin-float 3.2s ease-in-out infinite;
+  filter:drop-shadow(0 0 6px var(--pin-color));
+}
+.map2-pin:hover .map2-pin-label{border-color:#fff;background:rgba(12,20,44,0.98)}
+.map2-pin.active .map2-pin-label{border-color:#fff;box-shadow:0 0 12px var(--pin-color)}
+.map2-pin-label{
+  background:rgba(4,8,20,0.88);
+  border:1px solid var(--pin-color);
+  border-radius:3px;
+  padding:5px 10px;
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+  backdrop-filter:blur(6px);
+  transition:all .15s ease;
+  white-space:nowrap;
+}
+.map2-pin-name{
+  font-family:var(--font-mono);font-size:11px;color:#fff;
+  letter-spacing:0.06em;font-weight:600;
+}
+.map2-pin-meta{
+  font-family:var(--font-mono);font-size:9.5px;color:var(--pin-color);
+  letter-spacing:0.04em;
+}
+.map2-pin-line{
+  width:1px;height:14px;background:linear-gradient(to bottom, var(--pin-color), transparent);
+  opacity:0.8;
+}
+.map2-pin-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--pin-color);position:relative;
+  box-shadow:0 0 8px var(--pin-color), 0 0 16px var(--pin-color);
+}
+.map2-pin-ring{
+  position:absolute;inset:-5px;border-radius:50%;
+  border:1.5px solid var(--pin-color);opacity:0.5;
+  animation:pin-ring 2.2s ease-out infinite;
+}
+.map2-pin-ring2{
+  position:absolute;inset:-10px;border-radius:50%;
+  border:1px solid var(--pin-color);opacity:0.25;
+  animation:pin-ring 2.2s ease-out infinite .6s;
+}
+@keyframes pin-float{
+  0%,100%{transform:translate(-50%,-100%) translateY(0)}
+  50%{transform:translate(-50%,-100%) translateY(-8px)}
+}
+@keyframes pin-ring{
+  0%{transform:scale(1);opacity:0.5}
+  100%{transform:scale(2.2);opacity:0}
+}
 
 /* ------ plant detail overlay ------ */
 .detail-overlay{
