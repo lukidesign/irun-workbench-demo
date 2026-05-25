@@ -525,10 +525,6 @@ function ModeStrip({mode, onChange}){
   const modes = [
     {id:'map',   ic:'🗺', lb:'地图模式'},
     {id:'map2',  ic:'🌆', lb:'地图模式2'},
-    {id:'model', ic:'⬢',  lb:'模型模式'},
-    {id:'day',   ic:'☀',  lb:'日间模式'},
-    {id:'night', ic:'🌙', lb:'夜间模式'},
-    {id:'img1',  ic:'▣',  lb:'图片模式1'},
     {id:'img2',  ic:'▤',  lb:'图片模式2'},
   ];
   return (
