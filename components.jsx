@@ -761,6 +761,10 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen}){
               <div className="tt-cn">{hovered.name}</div>
               <div className="tt-cat" style={{color: hoveredCat.color}}>{hoveredCat.label} · {hovered.role}</div>
             </div>
+            <button className="tt-detail-btn"
+                    onClick={(e)=>{ e.stopPropagation(); onOpen?.(hovered.id); setHoverId(null); }}>
+              查看详情 →
+            </button>
           </div>
           <div className="tt-body">{hovered.intro}</div>
           <div className="tt-skills">
