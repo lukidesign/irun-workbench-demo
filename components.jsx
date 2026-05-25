@@ -696,7 +696,7 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen}){
     <div className="agents-rail" ref={railRef} onMouseLeave={()=>setHoverId(null)}>
       <div className="agents-rail-hd">
         AI&nbsp;AGENTS
-        <em>人工智能代理 · 10</em>
+        <em>10</em>
       </div>
       <div className="agents-rail-list">
         {_AGENTS.map(a=>{
