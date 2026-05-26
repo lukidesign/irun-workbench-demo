@@ -760,6 +760,11 @@ body{
   pointer-events:none;z-index:20;
   background:radial-gradient(ellipse 60% 60% at 50% 50%, rgba(4,7,16,0.55), transparent 80%);
 }
+/* img2 mode + focused plant: hide dock, expand detail to fill the bottom area too */
+.workbench.img2-focused .dock{display:none}
+.workbench.img2-focused .detail-overlay{bottom:0;background:none}
+.workbench.img2-focused .detail{width:1760px;height:980px}
+.workbench.img2-focused .stage{bottom:0}
 .detail{
   pointer-events:auto;width:1640px;height:780px;
   background:

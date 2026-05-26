@@ -116,7 +116,7 @@ function App(){
 
   return (
     <LangCtx.Provider value={lang}>
-    <div className="workbench">
+    <div className={`workbench${(viewMode==='img2' && focusPlant) ? ' img2-focused' : ''}`}>
       {/* background scene */}
       <div className="scene">
         <div className="grid-bg"/>
@@ -138,7 +138,7 @@ function App(){
 
       {/* full-screen plants map / 3D scene */}
       {viewMode === 'map' && <PlantsMap focusId={focusId} onFocus={setFocusId}/>}
-      {viewMode === 'map2' && <Map2Overlay focusId={focusId} onFocus={setFocusId}/>}
+      {viewMode === 'map2' && <Map2Overlay focusId={focusId} onFocus={(id)=>{ setFocusId(id); setViewMode('img2'); }}/>}
 
       {/* map2 展示/漫游 toggle */}
       {viewMode === 'map2' && (
