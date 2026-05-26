@@ -172,7 +172,8 @@ function App(){
         selected={selectedAgent}
         onSelect={setSelectedAgent}
         onOpen={setOpenAgent}
-        onSkillOpen={()=>setOpenSkillMarket(true)}/>
+        onSkillOpen={()=>setOpenSkillMarket(true)}
+        tooltipEnabled={dispatchCollapsed}/>
 
 
       {/* dock */}

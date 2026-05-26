@@ -855,12 +855,13 @@ function ChestIcon({variant, color}){
 
 // ──────────────────────────────────────────────────────────────────────
 // AgentsRail — vertical rail on the far right showing all agents as robot tiles
-function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpen}){
+function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpen, tooltipEnabled=true}){
   const [hoverId, setHoverId] = useState(null);
   const [hoverTop, setHoverTop] = useState(0);
   const railRef = useRef(null);
 
   const handleEnter = (id, e) => {
+    if (!tooltipEnabled) return;
     setHoverId(id);
     const rect = e.currentTarget.getBoundingClientRect();
     const railRect = railRef.current?.getBoundingClientRect();
