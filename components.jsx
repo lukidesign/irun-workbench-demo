@@ -205,8 +205,22 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
     { role:'agent', agent:'ops', text:'今日 06:00 ~ 现在，3 站托管运行良好。已自主闭环 2 起组串告警，0 起需人工介入。' },
   ]);
   const [input, setInput] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const bodyRef = useRef(null);
   const inputRef = useRef(null);
+  const l = useLang(); const zh = l !== 'en';
+
+  // Mock chat history sessions
+  const historySessions = [
+    { id:'h1', t:'09:42', title:'横州渔光 · 组串告警闭环', agent:'alert', msgs:8, today:true },
+    { id:'h2', t:'08:15', title:'今日 PR 排名速览', agent:'query', msgs:3, today:true },
+    { id:'h3', t:'昨日 17:30', title:'Banten-A 巡检调度', agent:'sched', msgs:12, today:false },
+    { id:'h4', t:'昨日 14:08', title:'光伏组件 SOP 检索', agent:'pv', msgs:5, today:false },
+    { id:'h5', t:'昨日 10:42', title:'高风险作业 24h 检视', agent:'safe', msgs:7, today:false },
+    { id:'h6', t:'05-24 16:20', title:'东源 #01 IV 偏移诊断', agent:'diag', msgs:9, today:false },
+    { id:'h7', t:'05-24 09:00', title:'iRun 日报生成 · 周一', agent:'ops', msgs:2, today:false },
+    { id:'h8', t:'05-23 11:15', title:'工单合并方案审议', agent:'order', msgs:14, today:false },
+  ];
 
   useEffect(()=>{
     if(bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -248,12 +262,63 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
   return (
     <div className="panel dispatch corners"><span className="c1"/>
       <div className="panel-hd">
-        <span><span className="dot" style={{background:'var(--violet)',boxShadow:'0 0 8px var(--violet)'}}/> <T z="对话调度" e="AI Dispatch"/></span>
+        <span style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className={`history-toggle${historyOpen?' on':''}`}
+                  onClick={()=>setHistoryOpen(v=>!v)}
+                  title={zh?'对话历史':'Chat History'}>
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4">
+              <circle cx="8" cy="8" r="6.2"/>
+              <path d="M8 4.2 V8 L10.4 10"/>
+            </svg>
+          </button>
+          <span className="dot" style={{background:'var(--violet)',boxShadow:'0 0 8px var(--violet)'}}/>
+          <T z="对话调度" e="AI Dispatch"/>
+        </span>
         <span style={{display:'flex',alignItems:'center',gap:10,color:'var(--text-mute)',fontSize:10}}>
           <span>DISPATCH · CONSOLE</span>
           <button className="panel-collapse" onClick={onCollapse} title="收起">›</button>
         </span>
       </div>
+
+      {/* History flyout — appears to the LEFT of dispatch panel, sliding rightward into view */}
+      {historyOpen && (
+        <div className="history-flyout">
+          <div className="hf-hd">
+            <span><T z="对话历史" e="Chat History"/></span>
+            <button className="hf-close" onClick={()=>setHistoryOpen(false)}>×</button>
+          </div>
+          <div className="hf-search">
+            <input placeholder={zh?'搜索历史会话…':'Search history…'}/>
+          </div>
+          <div className="hf-list">
+            {['today','earlier'].map(group=>{
+              const items = historySessions.filter(s => group==='today' ? s.today : !s.today);
+              if (!items.length) return null;
+              return (
+                <div key={group} className="hf-group">
+                  <div className="hf-group-hd">{group==='today' ? (zh?'今天':'Today') : (zh?'更早':'Earlier')}</div>
+                  {items.map(s=>{
+                    const ag = _ABI[s.agent];
+                    const cat = ag && _CATS[ag.cat];
+                    return (
+                      <div key={s.id} className="hf-item" onClick={()=>setHistoryOpen(false)}>
+                        <span className="hf-tag" style={{color:cat?.color, borderColor:(cat?.color||'#666')+'55'}}>{ag?.code}</span>
+                        <div className="hf-info">
+                          <div className="hf-title">{s.title}</div>
+                          <div className="hf-meta">{s.t} · {s.msgs} {zh?'条':'msgs'}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+          <div className="hf-foot">
+            <button className="hf-newbtn" onClick={()=>setHistoryOpen(false)}>+ {zh?'新建会话':'New Session'}</button>
+          </div>
+        </div>
+      )}
 
       <div className="chat-body" ref={bodyRef}>
         {messages.map((m,i)=>{
