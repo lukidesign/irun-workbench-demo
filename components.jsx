@@ -1106,8 +1106,14 @@ function EventStreamTab({onExpand, count=0}){
     <div className="stream-tab" onClick={onExpand} title={zh?'展开实时事件流':'Expand Event Stream'}>
       <div className="stream-tab-inner">
         <span className="arrow">›</span>
-        <span className="vlabel">{zh?'实 时 事 件 流':'E V E N T  S T R E A M'}</span>
-        <span className="vsub">EVENT&nbsp;·&nbsp;STREAM</span>
+        {zh ? (
+          <>
+            <span className="vlabel">实 时 事 件 流</span>
+            <span className="vsub">EVENT&nbsp;·&nbsp;STREAM</span>
+          </>
+        ) : (
+          <span className="vlabel vlabel-en">EVENT STREAM</span>
+        )}
         {count>0 && <span className="vcount">{count}</span>}
       </div>
     </div>
@@ -1122,8 +1128,14 @@ function DispatchTab({onExpand, unread=0}){
     <div className="dispatch-tab" onClick={onExpand} title={zh?'展开对话调度':'Expand AI Dispatch'}>
       <div className="dispatch-tab-inner">
         <span className="arrow">‹</span>
-        <span className="vlabel">{zh?'对 话 调 度':'A I  D I S P A T C H'}</span>
-        <span className="vsub">DISPATCH</span>
+        {zh ? (
+          <>
+            <span className="vlabel">对 话 调 度</span>
+            <span className="vsub">DISPATCH</span>
+          </>
+        ) : (
+          <span className="vlabel vlabel-en">AI DISPATCH</span>
+        )}
         {unread>0 && <span className="vdot"/>}
       </div>
     </div>
