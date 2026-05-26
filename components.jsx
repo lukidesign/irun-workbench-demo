@@ -46,8 +46,7 @@ function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack}){
         <div className="brand-text">
           <b>iRUN<span style={{color:'var(--cyan)'}}>·</span>WORKBENCH</b>
           <div className="brand-tenant">
-            <span className="bt-lbl">租户</span>
-            <select value={tenantIdx} onChange={e=>onTenant(Number(e.target.value))}>
+                        <select value={tenantIdx} onChange={e=>onTenant(Number(e.target.value))}>
               {_TENANTS.map((t,i)=>(
                 <option key={t.id} value={i}>{t.name}</option>
               ))}
@@ -607,7 +606,99 @@ function AgentTokenPanel({ busyMap, onOpen }) {
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, useClock, fmtTime, fmtDate };
+// ──────────────────────────────────────────────────────────────────────
+// Skill Market Modal
+const _SKILL_CATS = ['全部','数据分析','运维工具','安全合规','通知推送','自定义'];
+const _SKILLS = [
+  { id:'weather', icon:'🌤', name:'气象预测', en:'Weather Forecast', cat:'运维工具', ver:'2.1.0', desc:'融合气象局 API，实现 7 天光照预测与逐小时发电量估算', status:'loaded', provider:'润建科技' },
+  { id:'visual',  icon:'📸', name:'图像识别', en:'Visual AI',        cat:'运维工具', ver:'1.4.2', desc:'无人机巡检图像缺陷识别，支持热斑、遮挡、破损自动分类', status:'loaded', provider:'百度智能云' },
+  { id:'dingtalk',icon:'🔔', name:'钉钉推送', en:'DingTalk',         cat:'通知推送', ver:'3.0.1', desc:'告警事件自动推送至钉钉群，支持 @成员 与审批工作流联动', status:'loaded', provider:'钉钉' },
+  { id:'nl2sql',  icon:'🔍', name:'数据问答', en:'NL2SQL Pro',       cat:'数据分析', ver:'1.0.0', desc:'自然语言直接查询运维数据库，生成可视化报表与趋势图', status:'installed', provider:'Anthropic' },
+  { id:'safety',  icon:'🛡', name:'安全合规', en:'Safety Guard',     cat:'安全合规', ver:'2.0.0', desc:'作业票自动审核、危险源识别、应急预案一键触发与存档', status:'installed', provider:'上海昌邑' },
+  { id:'carbon',  icon:'🌱', name:'碳排放计算', en:'Carbon Calc',    cat:'数据分析', ver:'1.2.0', desc:'实时计算光伏减碳量、CCER 生成预测与绿电证书备案辅助', status:'available', provider:'碳阻迹' },
+  { id:'wecom',   icon:'💬', name:'企微机器人', en:'WeCom Bot',       cat:'通知推送', ver:'1.5.0', desc:'企业微信群机器人，支持智能体消息卡片与快捷回复指令', status:'available', provider:'腾讯云' },
+  { id:'grid',    icon:'⚡', name:'电网接入', en:'Grid Connect',     cat:'运维工具', ver:'Beta', desc:'与电网调度系统对接，实时上报发电数据并同步并网状态', status:'beta', provider:'国家电网' },
+  { id:'report',  icon:'📊', name:'报表引擎', en:'Report Engine',    cat:'数据分析', ver:'2.3.1', desc:'日/周/月报自动生成，支持 PDF/Excel 导出与邮件定时发送', status:'available', provider:'帆软软件' },
+  { id:'edge',    icon:'🖥', name:'边缘计算', en:'Edge AI',          cat:'运维工具', ver:'Beta', desc:'本地推理能力，断网场景下仍可运行核心告警与诊断逻辑', status:'beta', provider:'华为云' },
+  { id:'pvfore',  icon:'📈', name:'发电预测', en:'PV Forecast',      cat:'数据分析', ver:'1.9.0', desc:'基于历史数据与气象的短期发电量预测，精度 ≤ 3% 误差', status:'available', provider:'远景能源' },
+  { id:'openapi', icon:'⚙', name:'自定义 API', en:'Custom API',     cat:'自定义', ver:'Any', desc:'通过 OpenAPI 3.0 规范接入任意第三方服务，无需代码', status:'available', provider:'iRun Platform' },
+];
+
+function SkillModal({ onClose }){
+  const [cat, setCat] = useState('全部');
+  const [q, setQ] = useState('');
+  const filtered = _SKILLS.filter(s =>
+    (cat === '全部' || s.cat === cat) &&
+    (s.name.includes(q) || s.en.toLowerCase().includes(q.toLowerCase()) || s.desc.includes(q))
+  );
+  const loaded = _SKILLS.filter(s => s.status === 'loaded').length;
+
+  const statusLabel = { loaded:'已加载', installed:'已安装', available:'可安装', beta:'Beta' };
+
+  return (
+    <div className="modal-bd" onClick={onClose}>
+      <div className="skill-modal" onClick={e=>e.stopPropagation()}>
+        {/* header */}
+        <div className="skill-modal-hd">
+          <div className="skill-modal-title">
+            <h2>⚙ SKILL MARKETPLACE · 技能市场</h2>
+            <p>集成第三方技能 · 扩展智能体能力边界 · OpenAPI / SDK 双模式接入</p>
+          </div>
+          <div className="skill-modal-stats">
+            <div className="skill-modal-stat"><span className="sv">{_SKILLS.length}</span><span className="sl">总技能</span></div>
+            <div className="skill-modal-stat"><span className="sv" style={{color:'var(--cyan)'}}>{loaded}</span><span className="sl">已加载</span></div>
+            <div className="skill-modal-stat"><span className="sv" style={{color:'var(--emerald)'}}>2</span><span className="sl">已安装</span></div>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {/* toolbar */}
+        <div className="skill-modal-toolbar">
+          <div className="skill-search">
+            <span style={{color:'var(--text-mute)',fontSize:12}}>🔍</span>
+            <input placeholder="搜索技能名称、功能描述…" value={q} onChange={e=>setQ(e.target.value)}/>
+          </div>
+          <div className="skill-cats">
+            {_SKILL_CATS.map(c=>(
+              <div key={c} className={`skill-cat${cat===c?' active':''}`} onClick={()=>setCat(c)}>{c}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* skill grid */}
+        <div className="skill-modal-body">
+          {filtered.map(s=>(
+            <div key={s.id} className={`skill-card ${s.status}`}>
+              <div className="skill-card-top">
+                <div className="skill-card-icon">{s.icon}</div>
+                <div className="skill-card-info">
+                  <div className="skill-card-name">{s.name}</div>
+                  <div className="skill-card-en">{s.en} · v{s.ver}</div>
+                </div>
+              </div>
+              <div className="skill-card-desc">{s.desc}</div>
+              <div className="skill-card-footer">
+                <span className="skill-card-provider">{s.provider}</span>
+                <span className={`skill-status ${s.status}`}>{statusLabel[s.status]}</span>
+              </div>
+              {(s.status==='available') && (
+                <button className="skill-install-btn" style={{marginTop:6}}>+ 安装</button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* footer */}
+        <div className="skill-modal-footer">
+          <span>已加载 {loaded} 个技能 · 全部技能 {_SKILLS.length} 个 · 支持 OpenAPI / MCP / SDK 三种接入方式</span>
+          <span style={{color:'var(--violet)'}}>iRun Skill Runtime v2.4.0</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, useClock, fmtTime, fmtDate };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left
@@ -764,7 +855,7 @@ function ChestIcon({variant, color}){
 
 // ──────────────────────────────────────────────────────────────────────
 // AgentsRail — vertical rail on the far right showing all agents as robot tiles
-function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen}){
+function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpen}){
   const [hoverId, setHoverId] = useState(null);
   const [hoverTop, setHoverTop] = useState(0);
   const railRef = useRef(null);
@@ -811,6 +902,16 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen}){
             </div>
           );
         })}
+      </div>
+
+      {/* skill market entry */}
+      <div className="skill-entry-btn" onClick={()=>onSkillOpen?.()}>
+        <div className="skill-entry-icon">
+          ⚙
+          <span className="skill-entry-badge">12</span>
+        </div>
+        <div className="skill-entry-lbl">SKILLS</div>
+        <div className="skill-entry-sub">技能市场</div>
       </div>
 
       {hovered && (

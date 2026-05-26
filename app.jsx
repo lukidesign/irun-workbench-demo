@@ -1,7 +1,7 @@
 // iRun Workbench — App root
 const { useState: _aUseState, useEffect: _aUseEffect, useCallback: _aUseCallback } = React;
 const useState = _aUseState, useEffect = _aUseEffect, useCallback = _aUseCallback;
-const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip } = window.IRUN_UI;
+const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal } = window.IRUN_UI;
 const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
 const { PlantDetail } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
@@ -10,6 +10,7 @@ const { PLANTS: APP_PLANTS, TENANTS: APP_TENANTS, AGENTS: APP_AGENTS, AGENT_BY_I
 function App(){
   const [focusId, setFocusId] = useState(null);
   const [openAgent, setOpenAgent] = useState(null);
+  const [openSkillMarket, setOpenSkillMarket] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [dispatchCollapsed, setDispatchCollapsed] = useState(()=>{
     try { return localStorage.getItem('irun:dispatch-collapsed') === '1'; } catch(e){ return false; }
@@ -170,7 +171,8 @@ function App(){
         busyMap={busyMap}
         selected={selectedAgent}
         onSelect={setSelectedAgent}
-        onOpen={setOpenAgent}/>
+        onOpen={setOpenAgent}
+        onSkillOpen={()=>setOpenSkillMarket(true)}/>
 
 
       {/* dock */}
@@ -194,6 +196,9 @@ function App(){
 
       {/* agent modal */}
       {openAgent && <AgentModal agentId={openAgent} onClose={()=>setOpenAgent(null)} busyMap={busyMap}/>}
+
+      {/* skill market modal */}
+      {openSkillMarket && <SkillModal onClose={()=>setOpenSkillMarket(false)}/>}
     </div>
   );
 }
