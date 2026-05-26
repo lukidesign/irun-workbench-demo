@@ -1096,7 +1096,71 @@ function PlantTitle({plant, plants, onChange}){
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, useClock, fmtTime, fmtDate, LangCtx };
+// ──────────────────────────────────────────────────────────────────────
+// DroneFlight — animated drone that loops twice on an ellipse, then flies off
+function DroneFlight({onDone}){
+  const [pos, setPos] = useState({x: 960, y: 240, opacity: 0, rot: 0});
+  const startRef = useRef(null);
+  const rafRef = useRef(null);
+
+  useEffect(()=>{
+    const cx = 960, cy = 540, rx = 720, ry = 300;
+    const loopDur = 5.5;      // seconds per loop
+    const totalLoops = 2;
+    const fadeIn = 0.4;
+    const exitDur = 1.8;
+    const totalDur = totalLoops * loopDur + exitDur;
+
+    const tick = (t) => {
+      if(!startRef.current) startRef.current = t;
+      const elapsed = (t - startRef.current) / 1000;
+
+      if(elapsed < totalLoops * loopDur){
+        // start at top (-PI/2) and rotate clockwise
+        const theta = -Math.PI/2 + (elapsed / loopDur) * Math.PI * 2;
+        const x = cx + rx * Math.cos(theta);
+        const y = cy + ry * Math.sin(theta);
+        // tangent direction (image faces right by default)
+        const tx = -rx * Math.sin(theta);
+        const ty =  ry * Math.cos(theta);
+        const rot = Math.atan2(ty, tx) * 180 / Math.PI;
+        const opacity = Math.min(1, elapsed / fadeIn);
+        setPos({x, y, opacity, rot});
+        rafRef.current = requestAnimationFrame(tick);
+      } else if(elapsed < totalDur){
+        // exit upward + right
+        const u = (elapsed - totalLoops * loopDur) / exitDur;
+        const startX = cx + rx * Math.cos(-Math.PI/2);
+        const startY = cy + ry * Math.sin(-Math.PI/2);
+        const x = startX + (2400 - startX) * u;
+        const y = startY + (-300 - startY) * u;
+        const rot = -25;
+        const opacity = Math.max(0, 1 - u * 0.7);
+        setPos({x, y, opacity, rot});
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        onDone?.();
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return ()=>{ if(rafRef.current) cancelAnimationFrame(rafRef.current); };
+  },[]);
+
+  return (
+    <div className="drone-flight"
+         style={{
+           left: pos.x+'px',
+           top: pos.y+'px',
+           opacity: pos.opacity,
+           transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`
+         }}>
+      <img src="wrj001.png" alt="UAV"/>
+      <div className="drone-shadow"/>
+    </div>
+  );
+}
+
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, DroneFlight, useClock, fmtTime, fmtDate, LangCtx };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left
@@ -1267,7 +1331,7 @@ function ChestIcon({variant, color}){
 
 // ──────────────────────────────────────────────────────────────────────
 // AgentsRail — vertical rail on the far right showing all agents as robot tiles
-function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpen, tooltipEnabled=true}){
+function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpen, onDroneFly, droneActive, tooltipEnabled=true}){
   const l = useLang(); const zh = l !== 'en';
   const [hoverId, setHoverId] = useState(null);
   const [hoverTop, setHoverTop] = useState(0);
@@ -1316,6 +1380,17 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
             </div>
           );
         })}
+      </div>
+
+      {/* drone fly button */}
+      <div className={`drone-btn${droneActive?' active':''}`}
+           onClick={()=>{ if(!droneActive) onDroneFly?.(); }}
+           title={zh?'无人机起飞':'Launch UAV'}>
+        <div className="drone-btn-icon">
+          <img src="wrj001.png" alt="UAV"/>
+        </div>
+        <div className="drone-btn-lbl">UAV</div>
+        <div className="drone-btn-sub">{zh?'无人机':'Drone'}</div>
       </div>
 
       {/* skill market entry */}

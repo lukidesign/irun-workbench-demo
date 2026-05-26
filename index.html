@@ -1303,6 +1303,40 @@ body{
 .scenario-timeline .step-name{min-width:240px;font-size:11px;color:var(--text);font-family:var(--font-mono)}
 
 /* ------ skill market entry btn (bottom of agents-rail) ------ */
+/* drone button (above SKILLS) */
+.drone-btn{
+  margin:6px 8px 0;padding:7px 4px 6px;
+  border:1px solid rgba(167,139,250,0.25);
+  background:rgba(167,139,250,0.04);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:all .18s ease;position:relative;flex-shrink:0;
+}
+.drone-btn:hover{border-color:var(--violet);background:rgba(167,139,250,0.1);box-shadow:0 0 12px rgba(167,139,250,0.22)}
+.drone-btn.active{border-color:var(--violet);background:rgba(167,139,250,0.16);box-shadow:0 0 14px rgba(167,139,250,0.35);pointer-events:none}
+.drone-btn-icon{
+  width:36px;height:36px;display:grid;place-items:center;position:relative;
+  border:1px solid rgba(167,139,250,0.35);
+  background:radial-gradient(circle at 40% 40%, rgba(167,139,250,0.16), transparent 70%);
+}
+.drone-btn-icon img{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 0 4px rgba(167,139,250,0.5))}
+.drone-btn:hover .drone-btn-icon img,.drone-btn.active .drone-btn-icon img{
+  animation:drone-bob 1.2s ease-in-out infinite;
+}
+@keyframes drone-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+.drone-btn-lbl{font-family:var(--font-display);font-size:11px;letter-spacing:0.16em;color:#fff;font-weight:600;text-transform:uppercase}
+.drone-btn-sub{font-family:var(--font-mono);font-size:9px;letter-spacing:0.08em;color:var(--text-mute)}
+
+/* drone flying overlay */
+.drone-flight{
+  position:absolute;z-index:55;pointer-events:none;
+  transform-origin:center;
+  will-change:left,top,opacity,transform;
+}
+.drone-flight img{
+  width:88px;height:88px;object-fit:contain;display:block;
+  filter:drop-shadow(0 4px 14px rgba(34,211,238,0.4)) drop-shadow(0 0 12px rgba(167,139,250,0.45));
+}
+
 .skill-entry-btn{
   margin:6px 8px 8px;padding:8px 4px 9px;
   border:1px solid rgba(34,211,238,0.2);

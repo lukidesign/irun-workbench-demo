@@ -1,7 +1,7 @@
 // iRun Workbench — App root
 const { useState: _aUseState, useEffect: _aUseEffect, useCallback: _aUseCallback } = React;
 const useState = _aUseState, useEffect = _aUseEffect, useCallback = _aUseCallback;
-const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal, PlantTitle, LangCtx } = window.IRUN_UI;
+const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal, PlantTitle, DroneFlight, LangCtx } = window.IRUN_UI;
 const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
 const { PlantDetail, PlantInlineDock, useScenarioStepping } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
@@ -48,6 +48,7 @@ function App(){
   const [busyMap, setBusyMap] = useState({});
   const [scenarioEvents, setScenarioEvents] = useState([]);
   const [showPlantModal, setShowPlantModal] = useState(false);
+  const [droneFlying, setDroneFlying] = useState(false);
 
   // Fit-to-viewport scaling
   useEffect(()=>{
@@ -194,7 +195,12 @@ function App(){
         onSelect={(id)=>{ setSelectedAgent(id); if (id && dispatchCollapsed) toggleDispatch(false); }}
         onOpen={setOpenAgent}
         onSkillOpen={()=>setOpenSkillMarket(true)}
+        onDroneFly={()=>setDroneFlying(true)}
+        droneActive={droneFlying}
         tooltipEnabled={dispatchCollapsed}/>
+
+      {/* drone fly overlay */}
+      {droneFlying && <DroneFlight onDone={()=>setDroneFlying(false)}/>}
 
 
       {/* dock — img2+focusPlant shows inline plant dashboard, else agent token panel */}
