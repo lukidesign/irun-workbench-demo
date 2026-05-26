@@ -257,10 +257,13 @@ body{
 }
 
 .crumbs{
-  display:flex;align-items:center;gap:10px;padding:0 18px;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
+  gap:6px;padding:0 18px;border-right:1px solid var(--line);min-width:180px;
 }
 .crumb{font-size:11.5px;color:var(--text-mute);letter-spacing:0.18em;text-transform:uppercase}
 .crumb.active{color:var(--text)}
+.crumb-top{cursor:pointer;transition:color .15s ease;padding-left:2px}
+.crumb-top:hover{color:var(--cyan)}
 .crumb-sep{color:var(--text-mute);opacity:0.45}
 
 .kpis{flex:1;display:flex;align-items:stretch}

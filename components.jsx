@@ -83,9 +83,8 @@ function TopBar({focusPlant, plants, onPlantChange, tenant, tenantIdx, onTenant,
       </div>
 
       <div className="crumbs">
-        <span className={`crumb ${!focusPlant?'active':''}`} onClick={onBack} style={{cursor:focusPlant?'pointer':'default'}}>{zh?'总览':'Overview'}</span>
+        <span className={`crumb crumb-top ${!focusPlant?'active':''}`} onClick={onBack} style={{cursor:focusPlant?'pointer':'default'}}>{zh?'总览':'Overview'}</span>
         {focusPlant && <>
-          <span className="crumb-sep">/</span>
           <div className="crumb-picker" ref={pickerRef}>
             <button type="button"
                     className={`crumb active picker-btn${plantPickerOpen?' open':''}`}
