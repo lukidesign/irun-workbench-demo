@@ -146,7 +146,7 @@ function App(){
         return <div className="scene-img-bg" style={{backgroundImage:`url('${bg}')`}}/>;
       })()}
       {(viewMode === 'map2' && map2SubMode === 'show') && (
-        <div className="scene-img-bg" style={{backgroundImage:`url('map2.jpg')`}}/>
+        <div className="scene-img-bg" style={{backgroundImage:`url('rjgf001.png')`}}/>
       )}
       {/* map2 漫游 — video background */}
       {(viewMode === 'map2' && map2SubMode === 'roam') && (
