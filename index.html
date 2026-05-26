@@ -231,16 +231,10 @@ body{
   border-right:1px solid var(--line);min-width:280px;
 }
 .brand-mark{
-  width:34px;height:34px;border:1px solid var(--cyan);position:relative;
-  display:grid;place-items:center;
-  background:radial-gradient(circle at 30% 30%, rgba(34,211,238,0.25), transparent 60%);
+  width:40px;height:40px;position:relative;
+  display:grid;place-items:center;flex-shrink:0;
 }
-.brand-mark::before,.brand-mark::after{
-  content:"";position:absolute;border:1px solid var(--cyan);opacity:0.55;
-}
-.brand-mark::before{inset:3px;border-radius:50%;}
-.brand-mark::after{inset:9px;border-radius:50%;border-color:rgba(34,211,238,0.4)}
-.brand-mark span{position:relative;font-family:var(--font-display);font-weight:700;font-size:12px;color:var(--cyan);letter-spacing:0.15em}
+.brand-icon{width:40px;height:40px;object-fit:contain;display:block}
 .brand-text{display:flex;flex-direction:column;line-height:1.1}
 .brand-text b{font-family:var(--font-display);font-weight:700;font-size:18px;color:#fff;letter-spacing:0.12em}
 .brand-text small{font-size:10.5px;color:var(--text-mute);letter-spacing:0.22em;text-transform:uppercase;margin-top:2px}

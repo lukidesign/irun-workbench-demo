@@ -42,7 +42,7 @@ function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack}){
   return (
     <div className="topbar">
       <div className="brand">
-        <div className="brand-mark"><span>iR</span></div>
+        <div className="brand-mark"><img src="irun-icon.png" alt="iRun" className="brand-icon"/></div>
         <div className="brand-text">
           <b>iRUN<span style={{color:'var(--cyan)'}}>·</span>WORKBENCH</b>
           <div className="brand-tenant">
