@@ -185,9 +185,7 @@ function App(){
 
       {/* dock */}
       <div className="dock">
-        <MiniMap focusPlant={focusPlant} onFocus={setFocusId}/>
         <AgentTokenPanel busyMap={busyMap} onOpen={setOpenAgent}/>
-        <QuickFuncs focusPlant={focusPlant} totalTokens={totalTokens} busyCount={busyCount}/>
       </div>
 
       {/* plant detail overlay (auto-cycle scenarios) */}
