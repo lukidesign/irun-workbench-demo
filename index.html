@@ -310,6 +310,15 @@ body{
 .live-time .dt{font-size:10px;opacity:0.75}
 .live-time .tm{font-size:12px;font-weight:500}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+.lang-toggle{
+  display:flex;align-items:center;gap:3px;
+  background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.25);border-radius:5px;
+  padding:4px 8px;cursor:pointer;font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;
+  color:rgba(180,220,255,0.55);transition:border-color .2s,background .2s;flex-shrink:0;
+}
+.lang-toggle:hover{background:rgba(34,211,238,0.12);border-color:rgba(34,211,238,0.5);}
+.lang-toggle .lt-active{color:var(--cyan);font-weight:600;}
+.lang-toggle .lt-sep{opacity:0.35;}
 
 /* ------ stage ------ */
 .stage{

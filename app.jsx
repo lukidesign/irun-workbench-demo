@@ -1,7 +1,7 @@
 // iRun Workbench — App root
 const { useState: _aUseState, useEffect: _aUseEffect, useCallback: _aUseCallback } = React;
 const useState = _aUseState, useEffect = _aUseEffect, useCallback = _aUseCallback;
-const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal } = window.IRUN_UI;
+const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal, LangCtx } = window.IRUN_UI;
 const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
 const { PlantDetail } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
@@ -35,6 +35,12 @@ function App(){
   const tenant = APP_TENANTS[tenantIdx];
   const [viewMode, setViewMode] = useState('map'); // map | map2 | img2
   const [map2SubMode, setMap2SubMode] = useState('show'); // show | roam
+  const [lang, setLang] = useState(()=>{ try{ return localStorage.getItem('irun:lang')||'zh'; }catch(e){ return 'zh'; } });
+  const toggleLang = () => setLang(l => {
+    const n = l==='zh'?'en':'zh';
+    try{ localStorage.setItem('irun:lang', n); }catch(e){}
+    return n;
+  });
 
   // Scenario state when a plant is open
   const [scenarioIdx, setScenarioIdx] = useState(0);
@@ -109,6 +115,7 @@ function App(){
   const busyCount = Object.values(busyMap).filter(Boolean).length || 3;
 
   return (
+    <LangCtx.Provider value={lang}>
     <div className="workbench">
       {/* background scene */}
       <div className="scene">
@@ -146,7 +153,7 @@ function App(){
       <ModeStrip mode={viewMode} onChange={setViewMode}/>
 
       {/* top KPIs */}
-      <TopBar focusPlant={focusPlant} tenant={tenant} tenantIdx={tenantIdx} onTenant={setTenantIdx} onBack={()=>setFocusId(null)}/>
+      <TopBar focusPlant={focusPlant} tenant={tenant} tenantIdx={tenantIdx} onTenant={setTenantIdx} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang}/>
 
       {/* left + right rails over map */}
       <div className="stage">
@@ -201,6 +208,7 @@ function App(){
       {/* skill market modal */}
       {openSkillMarket && <SkillModal onClose={()=>setOpenSkillMarket(false)}/>}
     </div>
+    </LangCtx.Provider>
   );
 }
 

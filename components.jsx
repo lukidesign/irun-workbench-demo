@@ -1,5 +1,12 @@
 // iRun Workbench — UI components (no top-level App; mounted from app.jsx)
-const {
+
+// ── Language Context ────────────────────────────────────────────────────
+const LangCtx = React.createContext('zh');
+const useLang = () => React.useContext(LangCtx);
+// t(zh, en) — picks text based on current lang context
+function T({z, e}){ const l = useLang(); return l==='zh' ? z : e; }
+
+const
   AGENTS: _AGENTS,
   AGENT_BY_ID: _ABI,
   AGENT_CATEGORIES: _CATS,
@@ -28,8 +35,9 @@ function fmtDate(d){
 
 // ──────────────────────────────────────────────────────────────────────
 // Top bar
-function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack}){
+function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack, lang, onLang}){
   const clock = useClock();
+  const zh = lang !== 'en';
   const k = focusPlant ? {
     cap: focusPlant.capacity, pwr: focusPlant.power, gen: focusPlant.gen, al: focusPlant.alerts,
     plants: 1, risk: focusPlant.risk === 'high' ? 1 : 0,
@@ -57,7 +65,7 @@ function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack}){
       </div>
 
       <div className="crumbs">
-        <span className={`crumb ${!focusPlant?'active':''}`} onClick={onBack} style={{cursor:focusPlant?'pointer':'default'}}>总览</span>
+        <span className={`crumb ${!focusPlant?'active':''}`} onClick={onBack} style={{cursor:focusPlant?'pointer':'default'}}>{zh?'总览':'Overview'}</span>
         {focusPlant && <>
           <span className="crumb-sep">/</span>
           <span className="crumb active">{focusPlant.name}</span>
@@ -66,34 +74,34 @@ function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack}){
 
       <div className="kpis">
         <div className="kpi">
-          <div className="l">在管电站</div>
-          <div className="v mono">{k.plants}<small>座 · {focusPlant?'当前聚焦':'全租户'}</small></div>
+          <div className="l">{zh?'在管电站':'Stations'}</div>
+          <div className="v mono">{k.plants}<small>{zh?`座 · ${focusPlant?'当前聚焦':'全租户'}`:`· ${focusPlant?'Current':'All'}`}</small></div>
           <div className="kpi-bar"><i style={{width: focusPlant?'100%':'82%'}}/></div>
         </div>
         <div className="kpi">
-          <div className="l">装机容量</div>
+          <div className="l">{zh?'装机容量':'Capacity'}</div>
           <div className="v mono">{k.cap.toFixed(1)}<small>MW</small></div>
           <div className="delta">▲ 18.2 MW · YTD</div>
         </div>
         <div className="kpi">
-          <div className="l">实时功率</div>
+          <div className="l">{zh?'实时功率':'Live Power'}</div>
           <div className="v mono">{k.pwr.toFixed(1)}<small>MW · {util}%</small></div>
           <div className="kpi-bar"><i style={{width:util+'%'}}/></div>
         </div>
         <div className="kpi">
-          <div className="l">今日发电</div>
+          <div className="l">{zh?'今日发电':"Today's Gen"}</div>
           <div className="v mono">{k.gen.toFixed(1)}<small>MWh</small></div>
-          <div className="delta">▲ 4.6% · 同比</div>
+          <div className="delta">▲ 4.6% · {zh?'同比':'YoY'}</div>
         </div>
         <div className="kpi">
-          <div className="l">活跃告警</div>
-          <div className="v mono" style={{color: k.al>10?'var(--rose)':'#fff'}}>{k.al}<small>条 · 待研判 {Math.max(0,k.al-12)}</small></div>
-          <div className="delta warn">告警去噪率 71%</div>
+          <div className="l">{zh?'活跃告警':'Alerts'}</div>
+          <div className="v mono" style={{color: k.al>10?'var(--rose)':'#fff'}}>{k.al}<small>{zh?`条 · 待研判 ${Math.max(0,k.al-12)}`:`· Pending ${Math.max(0,k.al-12)}`}</small></div>
+          <div className="delta warn">{zh?'告警去噪率 71%':'Noise Reduction 71%'}</div>
         </div>
         <div className="kpi">
-          <div className="l">KPI 风险</div>
-          <div className="v mono" style={{color: k.risk?'var(--amber)':'var(--emerald)'}}>{k.risk}<small>站需关注</small></div>
-          <div className="delta">运营智能体 · 持续监测</div>
+          <div className="l">{zh?'KPI 风险':'KPI Risk'}</div>
+          <div className="v mono" style={{color: k.risk?'var(--amber)':'var(--emerald)'}}>{k.risk}<small>{zh?'站需关注':' Needs Attn'}</small></div>
+          <div className="delta">{zh?'运营智能体 · 持续监测':'Ops Agent · Monitoring'}</div>
         </div>
       </div>
 
@@ -104,6 +112,11 @@ function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack}){
             <span className="tm">{fmtTime(clock)}</span>
           </div>
         </div>
+        <button className="lang-toggle" onClick={onLang} title={zh?'Switch to English':'切换中文'}>
+          <span className={zh?'lt-active':''}> 中 </span>
+          <span className="lt-sep">/</span>
+          <span className={!zh?'lt-active':''}>EN</span>
+        </button>
       </div>
     </div>
   );
@@ -154,7 +167,7 @@ function EventStream({focusPlant, scenarioEvents, onCollapse}){
   return (
     <div className="panel stream corners"><span className="c1"/>
       <div className="panel-hd">
-        <span><span className="dot"/> 实时事件流</span>
+        <span><span className="dot"/> <T z="实时事件流" e="Event Stream"/></span>
         <span style={{display:'flex',alignItems:'center',gap:10,color:'var(--text-mute)',fontSize:10}}>
           <span>EVENT · STREAM</span>
           <button className="panel-collapse" onClick={onCollapse} title="收起">‹</button>
@@ -214,7 +227,7 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
   return (
     <div className="panel dispatch corners"><span className="c1"/>
       <div className="panel-hd">
-        <span><span className="dot" style={{background:'var(--violet)',boxShadow:'0 0 8px var(--violet)'}}/> 对话调度</span>
+        <span><span className="dot" style={{background:'var(--violet)',boxShadow:'0 0 8px var(--violet)'}}/> <T z="对话调度" e="AI Dispatch"/></span>
         <span style={{display:'flex',alignItems:'center',gap:10,color:'var(--text-mute)',fontSize:10}}>
           <span>DISPATCH · CONSOLE</span>
           <button className="panel-collapse" onClick={onCollapse} title="收起">›</button>
@@ -223,11 +236,11 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
 
       {targetAgent && (
         <div className="target-strip">
-          <span className="lbl">当前指挥</span>
+          <span className="lbl"><T z="当前指挥" e="Target"/></span>
           <span className="who" style={{color: _CATS[targetAgent.cat].color}}>
             @{targetAgent.short} · {targetAgent.en}
           </span>
-          <span className="dismiss" onClick={()=>onSelectAgent?.(null)}>清除</span>
+          <span className="dismiss" onClick={()=>onSelectAgent?.(null)}><T z="清除" e="Clear"/></span>
         </div>
       )}
 
@@ -349,7 +362,7 @@ function MiniMap({focusPlant, onFocus}){
   return (
     <div className="panel mini-map corners"><span className="c1"/>
       <div className="panel-hd">
-        <span><span className="dot"/> 区域分布</span>
+        <span><span className="dot"/> <T z="区域分布" e="Area Map"/></span>
         <span style={{color:'var(--text-mute)',fontSize:10}}>{_PLANTS.length} SITES</span>
       </div>
       <div className="mm-canvas" style={{height:'calc(100% - 38px)'}}>
@@ -380,17 +393,18 @@ function MiniMap({focusPlant, onFocus}){
 // ──────────────────────────────────────────────────────────────────────
 // Quick functions (bottom-right) — tokens, work orders, KPI
 function QuickFuncs({focusPlant, totalTokens, busyCount}){
+  const l = useLang(); const zh = l !== 'en';
   const items = [
-    { id:'tok', ic:'TK', label:'Token 消耗', sub:'今日累计 · 全团队', val: (totalTokens/1000).toFixed(1), unit:'K' },
-    { id:'wo',  ic:'WO', label:'工单看板',   sub:'今日 · 新建/完成', val:'14/11', unit:'' },
-    { id:'kpi', ic:'PR', label:'PR 指标',    sub:'电站等效满发小时数', val:'4.62', unit:'h' },
-    { id:'rpt', ic:'RP', label:'iRun 日报',  sub:'运营智能体 · 自动生成', val:'06:00', unit:'' },
-    { id:'bus', ic:'AG', label:'活跃智能体', sub:'实时工作中', val: busyCount, unit:`/${_AGENTS.length}` },
+    { id:'tok', ic:'TK', label: zh?'Token 消耗':'Token Usage', sub: zh?'今日累计 · 全团队':'Today · All Agents', val: (totalTokens/1000).toFixed(1), unit:'K' },
+    { id:'wo',  ic:'WO', label: zh?'工单看板':'Work Orders',   sub: zh?'今日 · 新建/完成':'Today · New/Done', val:'14/11', unit:'' },
+    { id:'kpi', ic:'PR', label: zh?'PR 指标':'PR Index',       sub: zh?'电站等效满发小时数':'Full-Load Hours', val:'4.62', unit:'h' },
+    { id:'rpt', ic:'RP', label: zh?'iRun 日报':'Daily Report', sub: zh?'运营智能体 · 自动生成':'Ops Agent · Auto', val:'06:00', unit:'' },
+    { id:'bus', ic:'AG', label: zh?'活跃智能体':'Active Agents', sub: zh?'实时工作中':'Working Now', val: busyCount, unit:`/${_AGENTS.length}` },
   ];
   return (
     <div className="panel quick-funcs corners"><span className="c1"/>
       <div className="panel-hd">
-        <span><span className="dot"/> 快捷功能</span>
+        <span><span className="dot"/> <T z="快捷功能" e="Quick Panels"/></span>
         <span style={{color:'var(--text-mute)',fontSize:10}}>QUICK · PANELS</span>
       </div>
       <div className="qf-list">
@@ -521,10 +535,11 @@ function AgentModal({agentId, onClose, busyMap}){
 // ──────────────────────────────────────────────────────────────────────
 // View mode strip — vertical buttons on far left
 function ModeStrip({mode, onChange}){
+  const l = useLang(); const zh = l !== 'en';
   const modes = [
-    {id:'map',   ic:'🗺', lb:'地图模式'},
-    {id:'map2',  ic:'🌆', lb:'地图模式2'},
-    {id:'img2',  ic:'▤',  lb:'图片模式2'},
+    {id:'map',   ic:'🗺', lb: zh?'地图模式':'Map Mode'},
+    {id:'map2',  ic:'🌆', lb: zh?'地图模式2':'Map Mode 2'},
+    {id:'img2',  ic:'▤',  lb: zh?'图片模式2':'Img Mode 2'},
   ];
   return (
     <div className="mode-strip">
@@ -544,6 +559,7 @@ function ModeStrip({mode, onChange}){
 // ──────────────────────────────────────────────────────────────────────
 // Agent Token Analytics Panel (replaces AgentDock in map2 mode)
 function AgentTokenPanel({ busyMap, onOpen }) {
+  const l = useLang(); const zh = l !== 'en';
   // Deterministic 24-hour sparkline seeded by agent index
   function genSpark(seed) {
     const pts = [];
@@ -562,7 +578,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
   return (
     <div className="panel agent-token-panel corners"><span className="c1"/>
       <div className="panel-hd">
-        <span><span className="dot"/> 智能体算力 · AGENT ANALYTICS</span>
+        <span><span className="dot"/> <T z="智能体算力 · AGENT ANALYTICS" e="Agent Analytics · TOKEN USAGE"/></span>
         <span style={{color:'var(--text-mute)',fontSize:10,letterSpacing:'0.1em'}}>24H TOKEN CURVE</span>
       </div>
       <div className="token-grid">
@@ -586,7 +602,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
                 <RobotAvatar agent={a} size={22} glow={busy}/>
                 <div className="tc-info">
                   <span className="tc-name">{a.short}</span>
-                  <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{busy ? '● 运行' : '○ 空闲'}</span>
+                  <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{busy ? (zh?'● 运行':'● Active') : (zh?'○ 空闲':'○ Idle')}</span>
                 </div>
                 <span className="tc-tok">{a.metrics.tokens}</span>
               </div>
@@ -596,7 +612,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
               </svg>
               <div className="tc-foot">
                 <span>{a.metrics.todayCalls} calls</span>
-                <span>峰 {peakH}:00 · {a.metrics.success}%</span>
+                <span>{zh?'峰':'Peak'} {peakH}:00 · {a.metrics.success}%</span>
               </div>
             </div>
           );
@@ -698,16 +714,17 @@ function SkillModal({ onClose }){
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, useClock, fmtTime, fmtDate };
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, useClock, fmtTime, fmtDate, LangCtx };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left
 function EventStreamTab({onExpand, count=0}){
+  const l = useLang(); const zh = l !== 'en';
   return (
-    <div className="stream-tab" onClick={onExpand} title="展开实时事件流">
+    <div className="stream-tab" onClick={onExpand} title={zh?'展开实时事件流':'Expand Event Stream'}>
       <div className="stream-tab-inner">
         <span className="arrow">›</span>
-        <span className="vlabel">实 时 事 件 流</span>
+        <span className="vlabel">{zh?'实 时 事 件 流':'E V E N T  S T R E A M'}</span>
         <span className="vsub">EVENT&nbsp;·&nbsp;STREAM</span>
         {count>0 && <span className="vcount">{count}</span>}
       </div>
@@ -718,11 +735,12 @@ function EventStreamTab({onExpand, count=0}){
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed dispatch tab — vertical handle that re-opens the dispatch panel
 function DispatchTab({onExpand, unread=0}){
+  const l = useLang(); const zh = l !== 'en';
   return (
-    <div className="dispatch-tab" onClick={onExpand} title="展开对话调度">
+    <div className="dispatch-tab" onClick={onExpand} title={zh?'展开对话调度':'Expand AI Dispatch'}>
       <div className="dispatch-tab-inner">
         <span className="arrow">‹</span>
-        <span className="vlabel">对 话 调 度</span>
+        <span className="vlabel">{zh?'对 话 调 度':'A I  D I S P A T C H'}</span>
         <span className="vsub">DISPATCH</span>
         {unread>0 && <span className="vdot"/>}
       </div>
@@ -856,6 +874,7 @@ function ChestIcon({variant, color}){
 // ──────────────────────────────────────────────────────────────────────
 // AgentsRail — vertical rail on the far right showing all agents as robot tiles
 function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpen, tooltipEnabled=true}){
+  const l = useLang(); const zh = l !== 'en';
   const [hoverId, setHoverId] = useState(null);
   const [hoverTop, setHoverTop] = useState(0);
   const railRef = useRef(null);
@@ -897,8 +916,8 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
                 {isOff && <span className="status-dot off"/>}
               </div>
               <div className="agent-tile-name">
-                <div className="nm-en">{a.en}</div>
-                <div className="nm-cn">{a.short}</div>
+                <div className="nm-en">{zh ? a.short : a.en}</div>
+                <div className="nm-cn">{zh ? a.en : a.role}</div>
               </div>
             </div>
           );
@@ -912,7 +931,7 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
           <span className="skill-entry-badge">12</span>
         </div>
         <div className="skill-entry-lbl">SKILLS</div>
-        <div className="skill-entry-sub">技能市场</div>
+        <div className="skill-entry-sub">{zh?'技能市场':'Skill Mkt'}</div>
       </div>
 
       {hovered && (
@@ -926,7 +945,7 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
             </div>
             <button className="tt-detail-btn"
                     onClick={(e)=>{ e.stopPropagation(); onOpen?.(hovered.id); setHoverId(null); }}>
-              查看详情 →
+              {zh?'查看详情 →':'Details →'}
             </button>
           </div>
           <div className="tt-body">{hovered.intro}</div>
@@ -934,11 +953,11 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
             {hovered.skills.map(s => <span key={s} style={{borderColor: hoveredCat.color+'55', color: hoveredCat.color}}>{s}</span>)}
           </div>
           <div className="tt-stats">
-            <div><span className="l">今日调用</span><span className="v">{hovered.metrics.todayCalls}</span></div>
+            <div><span className="l">{zh?'今日调用':'Calls'}</span><span className="v">{hovered.metrics.todayCalls}</span></div>
             <div><span className="l">Token</span><span className="v">{hovered.metrics.tokens}</span></div>
-            <div><span className="l">成功率</span><span className="v">{hovered.metrics.success}%</span></div>
+            <div><span className="l">{zh?'成功率':'Success'}</span><span className="v">{hovered.metrics.success}%</span></div>
           </div>
-          <div className="tt-foot">单击选为指挥目标 · 双击查看工作面板</div>
+          <div className="tt-foot">{zh?'单击选为指挥目标 · 双击查看工作面板':'Click to select · Double-click to open panel'}</div>
         </div>
       )}
     </div>
