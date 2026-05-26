@@ -6,7 +6,7 @@ const useLang = () => React.useContext(LangCtx);
 // t(zh, en) — picks text based on current lang context
 function T({z, e}){ const l = useLang(); return l==='zh' ? z : e; }
 
-const
+const {
   AGENTS: _AGENTS,
   AGENT_BY_ID: _ABI,
   AGENT_CATEGORIES: _CATS,
