@@ -906,20 +906,46 @@ function ModeStrip({mode, onChange}){
 // Agent Token Analytics Panel (replaces AgentDock in map2 mode)
 function AgentTokenPanel({ busyMap, onOpen }) {
   const l = useLang(); const zh = l !== 'en';
-  // Deterministic 24-hour sparkline seeded by agent index
+  const N = 24; // points per sparkline
+
+  // Deterministic seeded RNG → so each agent starts with a stable curve
+  function seededRng(seed){
+    let s = seed >>> 0;
+    return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  }
   function genSpark(seed) {
+    const rng = seededRng(seed);
     const pts = [];
-    for (let h = 0; h < 24; h++) {
+    for (let h = 0; h < N; h++) {
       const base = (h >= 8 && h <= 19)
         ? 0.3 + 0.65 * Math.sin((h - 8) / 11 * Math.PI)
-        : 0.04;
-      const r = ((seed * 1664525 + h * 1013904223) >>> 0) / 4294967296;
-      pts.push(Math.max(0.04, Math.min(1, base + (r - 0.5) * 0.3)));
+        : 0.08;
+      pts.push(Math.max(0.04, Math.min(1, base + (rng() - 0.5) * 0.3)));
     }
     return pts;
   }
 
-  const W = 100, H = 22;
+  // Each agent owns its own live spark array, evolving over time
+  const [sparks, setSparks] = useState(() => _AGENTS.map((_, i) => genSpark(i * 31337 + 7)));
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSparks(prev => prev.map((arr, i) => {
+        // shift left, append new value influenced by previous + noise + per-agent phase
+        const phase = (Date.now() / 1000 + i * 1.7) * 0.4;
+        const wave = 0.45 + 0.4 * Math.sin(phase) + (Math.random() - 0.5) * 0.18;
+        const last = arr[arr.length - 1];
+        const next = Math.max(0.04, Math.min(1, last * 0.55 + wave * 0.45));
+        return [...arr.slice(1), next];
+      }));
+    }, 700);
+    return () => clearInterval(id);
+  }, []);
+
+  const W = 100, H = 32;
+
+  // duplicate the agent list for seamless infinite scroll
+  const list = [..._AGENTS, ..._AGENTS];
 
   return (
     <div className="panel agent-token-panel corners"><span className="c1"/>
@@ -928,41 +954,44 @@ function AgentTokenPanel({ busyMap, onOpen }) {
         <span style={{color:'var(--text-mute)',fontSize:10,letterSpacing:'0.1em'}}>24H TOKEN CURVE</span>
       </div>
       <div className="token-grid">
-        {_AGENTS.map((a, i) => {
-          const cat = _CATS[a.cat];
-          const busy = busyMap?.[a.id];
-          const spark = genSpark(i * 31337 + 7);
-          const mx = Math.max(...spark);
-          const peakH = spark.indexOf(mx);
-          const color = busy ? '#22d3ee' : cat.color;
-          const polyPts = spark.map((v, idx) =>
-            `${(idx / 23) * W},${H - 2 - (v / mx) * (H - 5)}`
-          ).join(' ');
-          const areaPts = `0,${H} ${polyPts} ${W},${H}`;
-          return (
-            <div key={a.id}
-                 className={`token-card${busy ? ' busy' : ''}`}
-                 style={{'--cat-color': color}}
-                 onClick={() => onOpen(a.id)}>
-              <div className="tc-top">
-                <RobotAvatar agent={a} size={22} glow={busy}/>
-                <div className="tc-info">
-                  <span className="tc-name">{zh ? a.short : a.en}</span>
-                  <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{busy ? (zh?'● 运行':'● Active') : (zh?'○ 空闲':'○ Idle')}</span>
+        <div className="token-track">
+          {list.map((a, dupIdx) => {
+            const i = dupIdx % _AGENTS.length;
+            const cat = _CATS[a.cat];
+            const busy = busyMap?.[a.id];
+            const spark = sparks[i];
+            const mx = Math.max(...spark);
+            const peakH = spark.indexOf(mx);
+            const color = busy ? '#22d3ee' : cat.color;
+            const polyPts = spark.map((v, idx) =>
+              `${(idx / (N-1)) * W},${H - 2 - (v / mx) * (H - 5)}`
+            ).join(' ');
+            const areaPts = `0,${H} ${polyPts} ${W},${H}`;
+            return (
+              <div key={`${a.id}-${dupIdx}`}
+                   className={`token-card${busy ? ' busy' : ''}`}
+                   style={{'--cat-color': color}}
+                   onClick={() => onOpen(a.id)}>
+                <div className="tc-top">
+                  <RobotAvatar agent={a} size={22} glow={busy}/>
+                  <div className="tc-info">
+                    <span className="tc-name">{zh ? a.short : a.en}</span>
+                    <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{busy ? (zh?'● 运行':'● Active') : (zh?'○ 空闲':'○ Idle')}</span>
+                  </div>
+                  <span className="tc-tok">{a.metrics.tokens}</span>
                 </div>
-                <span className="tc-tok">{a.metrics.tokens}</span>
+                <svg className="tc-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+                  <polygon points={areaPts} fill={color} fillOpacity="0.13"/>
+                  <polyline points={polyPts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>
+                </svg>
+                <div className="tc-foot">
+                  <span>{a.metrics.todayCalls} calls</span>
+                  <span>{zh?'峰':'Peak'} {peakH}:00 · {a.metrics.success}%</span>
+                </div>
               </div>
-              <svg className="tc-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-                <polygon points={areaPts} fill={color} fillOpacity="0.13"/>
-                <polyline points={polyPts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>
-              </svg>
-              <div className="tc-foot">
-                <span>{a.metrics.todayCalls} calls</span>
-                <span>{zh?'峰':'Peak'} {peakH}:00 · {a.metrics.success}%</span>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
