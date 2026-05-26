@@ -177,7 +177,7 @@ function App(){
         focusPlant={focusPlant}
         busyMap={busyMap}
         selected={selectedAgent}
-        onSelect={setSelectedAgent}
+        onSelect={(id)=>{ setSelectedAgent(id); if (id && dispatchCollapsed) toggleDispatch(false); }}
         onOpen={setOpenAgent}
         onSkillOpen={()=>setOpenSkillMarket(true)}
         tooltipEnabled={dispatchCollapsed}/>

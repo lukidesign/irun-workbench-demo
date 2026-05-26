@@ -206,10 +206,31 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
   ]);
   const [input, setInput] = useState('');
   const bodyRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(()=>{
     if(bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   },[messages]);
+
+  // When an agent is selected, auto-prefill `@<agent> ` into the input and focus it
+  useEffect(()=>{
+    if (!selectedAgent) return;
+    const ag = _ABI[selectedAgent];
+    if (!ag) return;
+    const prefix = `@${ag.short} `;
+    setInput(prev => {
+      // strip any previous @prefix and replace with the new one
+      const stripped = prev.replace(/^@\S+\s*/, '');
+      return prefix + stripped;
+    });
+    setTimeout(()=>{
+      if (inputRef.current){
+        inputRef.current.focus();
+        const v = inputRef.current.value;
+        inputRef.current.setSelectionRange(v.length, v.length);
+      }
+    }, 30);
+  },[selectedAgent]);
 
   const send = (text, agentId) => {
     if(!text.trim()) return;
@@ -278,6 +299,7 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
 
       <div className="composer">
         <input
+          ref={inputRef}
           placeholder={targetAgent ? `@${targetAgent.short} 输入指令…` : '@智能体 输入指令… 例如：@排程 合并今日工单'}
           value={input}
           onChange={e=>setInput(e.target.value)}
