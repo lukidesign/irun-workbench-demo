@@ -295,9 +295,53 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
   const [input, setInput] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [searchQ, setSearchQ] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState('');
   const bodyRef = useRef(null);
   const inputRef = useRef(null);
+  const renameInputRef = useRef(null);
   const l = useLang(); const zh = l !== 'en';
+
+  function startRename(s, e){
+    e?.stopPropagation();
+    setEditingId(s.id);
+    setEditValue(s.title);
+    setTimeout(()=>{
+      if (renameInputRef.current){
+        renameInputRef.current.focus();
+        renameInputRef.current.select();
+      }
+    }, 30);
+  }
+  function commitRename(){
+    if (!editingId) return;
+    const v = editValue.trim();
+    if (v) {
+      setSessions(prev => prev.map(s => s.id===editingId ? {...s, title:v} : s));
+    }
+    setEditingId(null);
+    setEditValue('');
+  }
+  function cancelRename(){
+    setEditingId(null);
+    setEditValue('');
+  }
+  function deleteSession(id, e){
+    e?.stopPropagation();
+    setSessions(prev => {
+      const next = prev.filter(s => s.id !== id);
+      // ensure there's always at least one session
+      if (next.length === 0){
+        const fresh = { id:'s_cur', t:'当前', dateLabel:'today', agent:'ops',
+          title: zh?'当前会话':'Current Session', isCurrent:true,
+          msgs:[{ role:'sys', text: zh?'已连接 iRun 数字团队':'Connected to iRun team' }] };
+        if (currentId === id) setCurrentId('s_cur');
+        return [fresh];
+      }
+      if (currentId === id) setCurrentId(next[0].id);
+      return next;
+    });
+  }
 
   const currentSession = sessions.find(s => s.id === currentId) || sessions[0];
   const messages = currentSession.msgs;
@@ -426,19 +470,52 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
                   {items.map(s=>{
                     const ag = _ABI[s.agent];
                     const cat = ag && _CATS[ag.cat];
-                    const msgCount = s.msgs.filter(m => m.role !== 'sys').length;
                     const active = s.id === currentId;
+                    const isEditing = editingId === s.id;
                     return (
                       <div key={s.id}
-                           className={`hf-item${active?' active':''}`}
-                           onClick={()=>selectSession(s.id)}
+                           className={`hf-item${active?' active':''}${isEditing?' editing':''}`}
+                           onClick={()=>{ if (!isEditing) selectSession(s.id); }}
                            title={s.title}>
                         <span className="hf-tag" style={{color:cat?.color, borderColor:(cat?.color||'#666')+'55'}}>{ag?.code}</span>
                         <div className="hf-info">
-                          <div className="hf-title">{s.title}</div>
-                          <div className="hf-meta">{s.t} · {msgCount} {zh?'条':'msgs'}</div>
+                          {isEditing ? (
+                            <input
+                              ref={renameInputRef}
+                              className="hf-rename-input"
+                              value={editValue}
+                              onChange={e=>setEditValue(e.target.value)}
+                              onBlur={commitRename}
+                              onClick={e=>e.stopPropagation()}
+                              onKeyDown={e=>{
+                                e.stopPropagation();
+                                if (e.key==='Enter') commitRename();
+                                else if (e.key==='Escape') cancelRename();
+                              }}
+                            />
+                          ) : (
+                            <div className="hf-title">{s.title}</div>
+                          )}
+                          <div className="hf-meta">{s.t}</div>
                         </div>
-                        {active && <span className="hf-active-dot"/>}
+                        {!isEditing && (
+                          <div className="hf-actions">
+                            <button className="hf-act-btn" title={zh?'重命名':'Rename'} onClick={(e)=>startRename(s, e)}>
+                              <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.4">
+                                <path d="M2 10 L2 12 L4 12 L11 5 L9 3 Z"/>
+                                <path d="M9 3 L11 5"/>
+                              </svg>
+                            </button>
+                            <button className="hf-act-btn hf-act-del" title={zh?'删除':'Delete'} onClick={(e)=>deleteSession(s.id, e)}>
+                              <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.4">
+                                <path d="M3 4 L11 4"/>
+                                <path d="M5 4 V3 a1 1 0 0 1 1 -1 h2 a1 1 0 0 1 1 1 V4"/>
+                                <path d="M4 4 L4.5 12 a1 1 0 0 0 1 1 h3 a1 1 0 0 0 1 -1 L10 4"/>
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                        {active && !isEditing && <span className="hf-active-dot"/>}
                       </div>
                     );
                   })}

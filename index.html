@@ -443,6 +443,31 @@ body{
   width:6px;height:6px;border-radius:50%;background:var(--cyan);
   box-shadow:0 0 6px var(--cyan);
 }
+.hf-item:hover .hf-active-dot{display:none}
+
+/* per-item hover actions (rename / delete) */
+.hf-actions{
+  position:absolute;top:50%;right:6px;transform:translateY(-50%);
+  display:none;gap:2px;
+  background:linear-gradient(90deg, transparent, rgba(8,12,24,0.95) 30%);
+  padding-left:14px;
+}
+.hf-item:hover .hf-actions{display:flex}
+.hf-act-btn{
+  background:transparent;border:1px solid rgba(34,211,238,0.3);
+  color:rgba(180,235,245,0.8);width:22px;height:22px;border-radius:3px;
+  cursor:pointer;padding:0;display:grid;place-items:center;
+  transition:all .12s ease;
+}
+.hf-act-btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(34,211,238,0.12)}
+.hf-act-btn.hf-act-del:hover{border-color:var(--rose);color:var(--rose);background:rgba(244,63,94,0.12)}
+
+/* inline rename input */
+.hf-rename-input{
+  width:100%;background:rgba(6,10,22,0.9);border:1px solid var(--cyan);border-radius:2px;
+  color:#fff;font-size:12px;padding:3px 6px;outline:none;
+  font-family:var(--font-base);line-height:1.35;
+}
 .hf-count{
   font-style:normal;font-family:var(--font-mono);font-size:9.5px;
   color:var(--cyan);background:rgba(34,211,238,0.12);
