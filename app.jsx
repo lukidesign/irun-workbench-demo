@@ -91,13 +91,14 @@ function App(){
     }
   }, [focusPlant?.id, focusPlant?.short]);
 
-  // Reset scenario state when leaving plant
+  // Reset scenario state when leaving plant (also drop back to map2 if we were in img2)
   useEffect(()=>{
     if (!focusPlant) {
       setBusyMap({});
       setMode('auto');
       setScenarioIdx(0);
       setShowPlantModal(false);
+      if (viewMode === 'img2') setViewMode('map2');
     }
   }, [focusPlant?.id]);
 
@@ -160,9 +161,6 @@ function App(){
         </div>
       )}
       {(viewMode === 'model' || viewMode === 'day' || viewMode === 'night') && <Scene3D mode={viewMode}/>}
-
-      {/* view mode strip (always visible, left edge) */}
-      <ModeStrip mode={viewMode} onChange={setViewMode}/>
 
       {/* top KPIs */}
       <TopBar focusPlant={focusPlant} plants={APP_PLANTS} onPlantChange={setFocusId} tenant={tenant} tenantIdx={tenantIdx} onTenant={setTenantIdx} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang}/>
