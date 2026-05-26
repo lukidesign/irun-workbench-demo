@@ -138,9 +138,13 @@ function App(){
       </div>
 
       {/* full-bleed image background (image modes + map2 展示) */}
-      {(viewMode === 'img2') && (
-        <div className="scene-img-bg" style={{backgroundImage:`url('img2.jpg')`}}/>
-      )}
+      {(viewMode === 'img2') && (() => {
+        const idx = focusPlant ? APP_PLANTS.findIndex(p=>p.id===focusPlant.id) : -1;
+        const bg = idx >= 0
+          ? `plant${String(idx+1).padStart(3,'0')}.png`
+          : 'img2.jpg';
+        return <div className="scene-img-bg" style={{backgroundImage:`url('${bg}')`}}/>;
+      })()}
       {(viewMode === 'map2' && map2SubMode === 'show') && (
         <div className="scene-img-bg" style={{backgroundImage:`url('map2.jpg')`}}/>
       )}
