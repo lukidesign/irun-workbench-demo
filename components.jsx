@@ -982,7 +982,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
                 </div>
                 <svg className="tc-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
                   <polygon points={areaPts} fill={color} fillOpacity="0.13"/>
-                  <polyline points={polyPts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>
+                  <polyline points={polyPts} fill="none" stroke={color} strokeWidth="0.75" strokeLinejoin="round" strokeLinecap="round"/>
                 </svg>
                 <div className="tc-foot">
                   <span>{a.metrics.todayCalls} calls</span>
