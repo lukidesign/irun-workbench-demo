@@ -1189,7 +1189,90 @@ function DroneFlight({onDone}){
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, DroneFlight, useClock, fmtTime, fmtDate, LangCtx };
+// ──────────────────────────────────────────────────────────────────────
+// PlantRobot — animated robot that walks a path through the plant img2 view
+// Uses a single image but simulates sprite-frame walking via CSS keyframes
+const PLANT_ROBOT_PATH = [
+  {x: 98, y: 76},  // off-screen right entry
+  {x: 92, y: 78},
+  {x: 82, y: 81},
+  {x: 65, y: 82},
+  {x: 54, y: 80},
+  {x: 51, y: 70},
+  {x: 50, y: 56},
+  {x: 52, y: 42},  // arrival at target (circle)
+];
+
+function PlantRobot(){
+  const [s, setS] = useState({x: 98, y: 76, facingLeft: true, opacity: 0, walk: false});
+  const startRef = useRef(null);
+  const rafRef = useRef(null);
+
+  useEffect(()=>{
+    const walkDur = 14;     // s — walk along path
+    const lingerDur = 2.5;  // s — pause at target
+    const fadeDur = 1;      // s — fade out
+    const gapDur = 1.5;     // s — invisible reset gap
+    const cycleDur = walkDur + lingerDur + fadeDur + gapDur;
+
+    const tick = (t) => {
+      if(!startRef.current) startRef.current = t;
+      const elapsed = ((t - startRef.current) / 1000) % cycleDur;
+
+      let phase;
+      if(elapsed < walkDur){
+        // walking
+        const u = elapsed / walkDur;
+        const segPos = u * (PLANT_ROBOT_PATH.length - 1);
+        const idx = Math.min(Math.floor(segPos), PLANT_ROBOT_PATH.length - 2);
+        const localU = segPos - idx;
+        const p0 = PLANT_ROBOT_PATH[idx];
+        const p1 = PLANT_ROBOT_PATH[idx+1];
+        const x = p0.x + (p1.x - p0.x) * localU;
+        const y = p0.y + (p1.y - p0.y) * localU;
+        const facingLeft = (p1.x - p0.x) < 0;
+        // fade in over first 0.6s
+        const opacity = Math.min(1, elapsed / 0.6);
+        phase = {x, y, facingLeft, opacity, walk: true};
+      } else if(elapsed < walkDur + lingerDur){
+        // linger at target
+        const last = PLANT_ROBOT_PATH[PLANT_ROBOT_PATH.length-1];
+        phase = {x: last.x, y: last.y, facingLeft: false, opacity: 1, walk: false};
+      } else if(elapsed < walkDur + lingerDur + fadeDur){
+        // fade out
+        const last = PLANT_ROBOT_PATH[PLANT_ROBOT_PATH.length-1];
+        const u = (elapsed - walkDur - lingerDur) / fadeDur;
+        phase = {x: last.x, y: last.y - u * 3, facingLeft: false, opacity: 1 - u, walk: false};
+      } else {
+        // gap (invisible) before next cycle
+        const first = PLANT_ROBOT_PATH[0];
+        phase = {x: first.x, y: first.y, facingLeft: true, opacity: 0, walk: false};
+      }
+
+      setS(phase);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return ()=>{ if(rafRef.current) cancelAnimationFrame(rafRef.current); };
+  },[]);
+
+  return (
+    <div className={`plant-robot${s.facingLeft?' flip':''}${s.walk?' walking':''}`}
+         style={{
+           left: s.x + '%',
+           top: s.y + '%',
+           opacity: s.opacity,
+         }}>
+      <div className="pr-shadow"/>
+      <div className="pr-sprite">
+        <img src="IRunRobot.png" alt="robot"/>
+      </div>
+      <div className="pr-glow"/>
+    </div>
+  );
+}
+
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, useClock, fmtTime, fmtDate, LangCtx };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left
