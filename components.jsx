@@ -255,16 +255,6 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
         </span>
       </div>
 
-      {targetAgent && (
-        <div className="target-strip">
-          <span className="lbl"><T z="当前指挥" e="Target"/></span>
-          <span className="who" style={{color: _CATS[targetAgent.cat].color}}>
-            @{targetAgent.short} · {targetAgent.en}
-          </span>
-          <span className="dismiss" onClick={()=>onSelectAgent?.(null)}><T z="清除" e="Clear"/></span>
-        </div>
-      )}
-
       <div className="chat-body" ref={bodyRef}>
         {messages.map((m,i)=>{
           if (m.role==='sys') return <div key={i} className="tag-line" style={{textAlign:'center',padding:'4px 0'}}>· {m.text} ·</div>;
@@ -305,8 +295,18 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
           onChange={e=>setInput(e.target.value)}
           onKeyDown={e=>{ if(e.key==='Enter') send(input); }}
         />
-        <button onClick={()=>send(input)}>下发</button>
+        <button onClick={()=>send(input)}><T z="发送" e="Send"/></button>
       </div>
+
+      {targetAgent && (
+        <div className="target-strip target-strip-bottom">
+          <span className="lbl"><T z="当前指挥" e="Target"/></span>
+          <span className="who" style={{color: _CATS[targetAgent.cat].color}}>
+            @{targetAgent.short} · {targetAgent.en}
+          </span>
+          <span className="dismiss" onClick={()=>onSelectAgent?.(null)}><T z="清除" e="Clear"/></span>
+        </div>
+      )}
     </div>
   );
 }

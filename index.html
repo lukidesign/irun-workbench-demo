@@ -414,6 +414,11 @@ body{
   display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);
   background:rgba(34,211,238,0.05);
 }
+.target-strip.target-strip-bottom{
+  border-bottom:none;border-top:1px solid var(--line);
+  flex-wrap:wrap;
+}
+.target-strip.target-strip-bottom .who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .target-strip .lbl{font-family:var(--font-display);font-size:10px;color:var(--text-mute);letter-spacing:0.18em;text-transform:uppercase}
 .target-strip .who{font-size:12px;font-weight:500;flex:1}
 .target-strip .dismiss{font-size:10.5px;color:var(--text-mute);cursor:pointer;letter-spacing:0.1em}
