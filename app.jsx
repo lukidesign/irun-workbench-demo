@@ -161,8 +161,8 @@ function App(){
       {/* map2 展示/漫游 toggle */}
       {viewMode === 'map2' && (
         <div className="map2-toggle">
-          <button className={`map2-toggle-btn${map2SubMode==='show'?' active':''}`} onClick={()=>setMap2SubMode('show')}>展示</button>
-          <button className={`map2-toggle-btn${map2SubMode==='roam'?' active':''}`} onClick={()=>setMap2SubMode('roam')}>漫游</button>
+          <button className={`map2-toggle-btn${map2SubMode==='show'?' active':''}`} onClick={()=>setMap2SubMode('show')}>{lang==='en'?'View':'展示'}</button>
+          <button className={`map2-toggle-btn${map2SubMode==='roam'?' active':''}`} onClick={()=>setMap2SubMode('roam')}>{lang==='en'?'Roam':'漫游'}</button>
         </div>
       )}
       {(viewMode === 'model' || viewMode === 'day' || viewMode === 'night') && <Scene3D mode={viewMode}/>}

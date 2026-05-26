@@ -172,6 +172,7 @@ function TopBar({focusPlant, plants, onPlantChange, tenant, tenantIdx, onTenant,
 // ──────────────────────────────────────────────────────────────────────
 // Live event stream (left)
 function EventStream({focusPlant, scenarioEvents, onCollapse}){
+  const l = useLang(); const zh = l !== 'en';
   const [events, setEvents] = useState(()=> seedEvents(14));
   const containerRef = useRef(null);
 
@@ -227,14 +228,15 @@ function EventStream({focusPlant, scenarioEvents, onCollapse}){
             const cat = ag && _CATS[ag.cat];
             const time = new Date(e.t);
             const p = n => String(n).padStart(2,'0');
+            const evtText = (!zh && e.en) ? e.en : e.text;
             return (
               <div key={e.id} className={`evt sev-${e.sev||'low'}`}>
                 <div className="row1">
                   <span className="mono">{p(time.getHours())}:{p(time.getMinutes())}:{p(time.getSeconds())}</span>
                   <span className="ag" style={{color:cat?.color,borderColor:cat?cat.color+'55':undefined}}>{ag?.code}</span>
-                  <span className="who">{ag?.short}</span>
+                  <span className="who">{zh ? ag?.short : ag?.en}</span>
                 </div>
-                <div className="txt">{e.text}</div>
+                <div className="txt">{evtText}</div>
               </div>
             );
           })}
@@ -602,10 +604,11 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
         {_QP.map((q,i)=>{
           const ag = _ABI[q.a];
           const cat = _CATS[ag.cat];
+          const qLabel = zh ? q.t : (q.en || q.t);
           return (
-            <div key={i} className="q-chip" onClick={()=>send(q.t, q.a)}>
-              <span className="tag" style={{color:cat.color}}>@{ag.short}</span>
-              <span>{q.t}</span>
+            <div key={i} className="q-chip" onClick={()=>send(qLabel, q.a)}>
+              <span className="tag" style={{color:cat.color}}>@{zh ? ag.short : ag.en}</span>
+              <span>{qLabel}</span>
             </div>
           );
         })}
@@ -614,7 +617,9 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
       <div className="composer">
         <input
           ref={inputRef}
-          placeholder={targetAgent ? `@${targetAgent.short} 输入指令…` : '@智能体 输入指令… 例如：@排程 合并今日工单'}
+          placeholder={targetAgent
+            ? (zh ? `@${targetAgent.short} 输入指令…` : `@${targetAgent.en} type command…`)
+            : (zh ? '@智能体 输入指令… 例如：@排程 合并今日工单' : '@agent type command… e.g. @Schedule merge today\'s tickets')}
           value={input}
           onChange={e=>setInput(e.target.value)}
           onKeyDown={e=>{ if(e.key==='Enter') send(input); }}
@@ -626,7 +631,7 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
         <div className="target-strip target-strip-bottom">
           <span className="lbl"><T z="当前指挥" e="Target"/></span>
           <span className="who" style={{color: _CATS[targetAgent.cat].color}}>
-            @{targetAgent.short} · {targetAgent.en}
+            @{zh ? targetAgent.short : targetAgent.en}{zh ? ` · ${targetAgent.en}` : ''}
           </span>
           <span className="dismiss" onClick={()=>onSelectAgent?.(null)}><T z="清除" e="Clear"/></span>
         </div>
@@ -777,17 +782,25 @@ function AgentModal({agentId, onClose, busyMap}){
 
   // synthetic workflow log
   const log = useMemo(()=>{
-    const seed = [
+    const tokenN = Math.floor(Math.random()*900+200);
+    return zh ? [
       ['09:42:18', '订阅事件总线 · 监听 alert.* 通道'],
       ['09:42:33', '收到 evt#A203 → 进入分析阶段'],
       ['09:42:34', '召回 RAG · 3 条相似案例 (相似度 0.91)'],
       ['09:42:36', '调用工具 plant.metrics.read · 384ms'],
-      ['09:42:37', `生成结论 · 推理 token 消耗 ${Math.floor(Math.random()*900+200)}`],
+      ['09:42:37', `生成结论 · 推理 token 消耗 ${tokenN}`],
       ['09:42:38', '产出工单字段并提交 → ord-agent'],
       ['09:42:40', '空闲 · 等待下一事件 …'],
+    ] : [
+      ['09:42:18', 'Subscribed event bus · listening on alert.* channel'],
+      ['09:42:33', 'Received evt#A203 → entering analysis'],
+      ['09:42:34', 'RAG recall · 3 similar cases (similarity 0.91)'],
+      ['09:42:36', 'Invoked plant.metrics.read · 384ms'],
+      ['09:42:37', `Synthesised conclusion · reasoning tokens ${tokenN}`],
+      ['09:42:38', 'Emitted ticket fields → ord-agent'],
+      ['09:42:40', 'Idle · waiting next event …'],
     ];
-    return seed;
-  },[agentId]);
+  },[agentId, zh]);
 
   // sparkline values
   const spark = useMemo(()=>Array.from({length:24},()=>Math.random()*0.7+0.2),[agentId]);
@@ -797,7 +810,7 @@ function AgentModal({agentId, onClose, busyMap}){
         <span className="c1"/>
         <div className="modal-hd">
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span className="live" style={{color:cat.color}}>● {isBusy?'工作中':'待命'}</span>
+            <span className="live" style={{color:cat.color}}>● {isBusy?(zh?'工作中':'Working'):(zh?'待命':'Idle')}</span>
             <span className="tag-line">AGENT · WORKING PANE</span>
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -812,32 +825,32 @@ function AgentModal({agentId, onClose, busyMap}){
               <div>
                 <h2>{zh ? a.name : a.en}</h2>
                 <div className="role" style={{color:cat.color}}>{cat.label} · {zh ? a.role : (a.enRole || a.role)}</div>
-                <p>{a.intro}</p>
+                <p>{zh ? a.intro : (a.enIntro || a.intro)}</p>
               </div>
             </div>
             <div className="section" style={{marginTop:18}}>
-              <h3>核心技能</h3>
+              <h3>{zh?'核心技能':'Core Skills'}</h3>
               <div className="skill-chips">
-                {a.skills.map(s=><span key={s} style={{color:cat.color,borderColor:cat.color+'55'}}>{s}</span>)}
+                {a.skills.map((s,si)=><span key={s} style={{color:cat.color,borderColor:cat.color+'55'}}>{zh ? s : (a.enSkills?.[si] || s)}</span>)}
               </div>
             </div>
             <div className="section" style={{marginTop:18}}>
-              <h3>今日工作统计</h3>
+              <h3>{zh?'今日工作统计':"Today's Stats"}</h3>
               <div className="stat-grid">
-                <div className="c"><div className="l">调用次数</div><div className="v mono">{a.metrics.todayCalls}</div></div>
+                <div className="c"><div className="l">{zh?'调用次数':'Calls'}</div><div className="v mono">{a.metrics.todayCalls}</div></div>
                 <div className="c"><div className="l">Token</div><div className="v mono">{a.metrics.tokens}</div></div>
-                <div className="c"><div className="l">成功率</div><div className="v mono">{a.metrics.success}%</div></div>
+                <div className="c"><div className="l">{zh?'成功率':'Success'}</div><div className="v mono">{a.metrics.success}%</div></div>
               </div>
               <div className="token-bars">
-                <div className="row"><span className="n">推理</span><div className="b"><i style={{width:'72%'}}/></div><span className="v mono">17.4K</span></div>
-                <div className="row"><span className="n">工具</span><div className="b"><i style={{width:'34%'}}/></div><span className="v mono">8.1K</span></div>
-                <div className="row"><span className="n">检索</span><div className="b"><i style={{width:'52%'}}/></div><span className="v mono">12.3K</span></div>
+                <div className="row"><span className="n">{zh?'推理':'Reason'}</span><div className="b"><i style={{width:'72%'}}/></div><span className="v mono">17.4K</span></div>
+                <div className="row"><span className="n">{zh?'工具':'Tools'}</span><div className="b"><i style={{width:'34%'}}/></div><span className="v mono">8.1K</span></div>
+                <div className="row"><span className="n">{zh?'检索':'Retrieval'}</span><div className="b"><i style={{width:'52%'}}/></div><span className="v mono">12.3K</span></div>
               </div>
             </div>
           </div>
           <div>
             <div className="section">
-              <h3>值班台 · 实时工作流</h3>
+              <h3>{zh?'值班台 · 实时工作流':'Duty Console · Live Workflow'}</h3>
               <div className="workflow">
                 {log.map((l,i)=>(
                   <div key={i} className="ln"><span className="ts">{l[0]}</span><span>{l[1]}</span></div>
@@ -845,7 +858,7 @@ function AgentModal({agentId, onClose, busyMap}){
               </div>
             </div>
             <div className="section" style={{marginTop:18}}>
-              <h3>今日趋势 · 调用频次</h3>
+              <h3>{zh?'今日趋势 · 调用频次':"Today's Trend · Call Frequency"}</h3>
               <svg viewBox="0 0 240 80" style={{width:'100%',height:80,marginTop:6}}>
                 <defs>
                   <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
@@ -1193,14 +1206,13 @@ function DroneFlight({onDone}){
 // PlantRobot — animated robot that walks a path through the plant img2 view
 // Uses a single image but simulates sprite-frame walking via CSS keyframes
 const PLANT_ROBOT_PATH = [
-  {x: 98, y: 76},  // off-screen right entry
-  {x: 92, y: 78},
-  {x: 82, y: 81},
-  {x: 65, y: 82},
-  {x: 54, y: 80},
-  {x: 51, y: 70},
-  {x: 50, y: 56},
-  {x: 52, y: 42},  // arrival at target (circle)
+  {x: 75, y: 105},  // bottom entry (off-screen)
+  {x: 74, y: 92},
+  {x: 73, y: 78},
+  {x: 70, y: 64},
+  {x: 62, y: 54},
+  {x: 50, y: 46},
+  {x: 38, y: 40},   // arrival at target (upper-left circle)
 ];
 
 function PlantRobot(){
@@ -1464,7 +1476,6 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
     <div className="agents-rail" ref={railRef} onMouseLeave={()=>setHoverId(null)}>
       <div className="agents-rail-hd">
         AI&nbsp;AGENTS
-        <em>10</em>
       </div>
       <div className="agents-rail-list">
         {_AGENTS.map(a=>{

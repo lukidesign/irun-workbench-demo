@@ -101,13 +101,18 @@ const MAP2_PINS = [
 ];
 
 function Map2Overlay({ focusId, onFocus }) {
+  const zh = React.useContext(window.IRUN_UI?.LangCtx || React.createContext('zh')) !== 'en';
   return (
     <div className="map2-overlay">
       {MAP2_PINS.map((pos, i) => {
         const plant = _MAP_PLANTS.find(p => p.id === pos.id);
         if (!plant) return null;
         const colour = plant.risk==='high' ? '#f87171' : plant.risk==='mid' ? '#fbbf24' : '#22d3ee';
-        const statusLabel = plant.risk==='high' ? '⚠ 高风险' : plant.risk==='mid' ? '△ 关注' : '✓ 正常';
+        const statusLabel = plant.risk==='high'
+          ? (zh?'⚠ 高风险':'⚠ High')
+          : plant.risk==='mid'
+            ? (zh?'△ 关注':'△ Watch')
+            : (zh?'✓ 正常':'✓ Normal');
         return (
           <div
             key={plant.id}

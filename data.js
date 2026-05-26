@@ -150,28 +150,28 @@ const SCENARIOS = [SCENARIO_A, SCENARIO_B];
 
 // Global event templates — used to spawn left-side stream when no plant is focused
 const GLOBAL_EVENT_TEMPLATES = [
-  { agent: 'alert',  text: 'P3 · 直流汇流箱告警自动归并 → 1 条研判', sev: 'mid' },
-  { agent: 'warn',   text: 'P1 · 子方阵 B-07 发电效能 ↓ 4.6% · 出预警', sev: 'mid' },
-  { agent: 'insp',   text: 'P3 · 无人机 UAV-01 完成 18 方阵巡检', sev: 'low' },
-  { agent: 'diag',   text: 'P2 · 诊断热斑 ×3 · 损失电量 ≈ 218 kWh', sev: 'mid' },
-  { agent: 'order',  text: 'P5 · 工单 WO-26052-201 自动验收通过', sev: 'low' },
-  { agent: 'sched',  text: 'P4 · 跨站行程合并 · 节省里程 38 km', sev: 'low' },
-  { agent: 'safe',   text: 'P1 · 雷雨临近 · 暂停 2 项登高作业', sev: 'high' },
-  { agent: 'query',  text: 'P3 · 张工 @问数 "本月 PR 同比" · 已返回', sev: 'low' },
-  { agent: 'pv',     text: 'P2 · 新人 @光伏 "组串绝缘检测流程"', sev: 'low' },
-  { agent: 'ops',    text: '租户 ILP · 月度可用率 99.41% · 达标', sev: 'low' },
-  { agent: 'alert',  text: 'P6 · 通信中断 12 min → 已自愈', sev: 'mid' },
-  { agent: 'warn',   text: 'P7 · IV 曲线偏移预警 · 转诊断', sev: 'mid' },
+  { agent: 'alert',  text: 'P3 · 直流汇流箱告警自动归并 → 1 条研判', en: 'P3 · DC combiner alerts auto-merged → 1 review', sev: 'mid' },
+  { agent: 'warn',   text: 'P1 · 子方阵 B-07 发电效能 ↓ 4.6% · 出预警', en: 'P1 · Array B-07 yield ↓ 4.6% · warning issued', sev: 'mid' },
+  { agent: 'insp',   text: 'P3 · 无人机 UAV-01 完成 18 方阵巡检', en: 'P3 · UAV-01 finished 18-array inspection', sev: 'low' },
+  { agent: 'diag',   text: 'P2 · 诊断热斑 ×3 · 损失电量 ≈ 218 kWh', en: 'P2 · 3 hot-spots diagnosed · loss ≈ 218 kWh', sev: 'mid' },
+  { agent: 'order',  text: 'P5 · 工单 WO-26052-201 自动验收通过', en: 'P5 · Ticket WO-26052-201 auto-accepted', sev: 'low' },
+  { agent: 'sched',  text: 'P4 · 跨站行程合并 · 节省里程 38 km', en: 'P4 · Cross-site routes merged · saved 38 km', sev: 'low' },
+  { agent: 'safe',   text: 'P1 · 雷雨临近 · 暂停 2 项登高作业', en: 'P1 · Storm approaching · 2 climbing jobs paused', sev: 'high' },
+  { agent: 'query',  text: 'P3 · 张工 @问数 "本月 PR 同比" · 已返回', en: 'P3 · Zhang @Query "MoM PR" · answered', sev: 'low' },
+  { agent: 'pv',     text: 'P2 · 新人 @光伏 "组串绝缘检测流程"', en: 'P2 · Onboard @PV-Assist "string insulation test SOP"', sev: 'low' },
+  { agent: 'ops',    text: '租户 ILP · 月度可用率 99.41% · 达标', en: 'Tenant ILP · monthly availability 99.41% · on target', sev: 'low' },
+  { agent: 'alert',  text: 'P6 · 通信中断 12 min → 已自愈', en: 'P6 · Comm outage 12 min → self-healed', sev: 'mid' },
+  { agent: 'warn',   text: 'P7 · IV 曲线偏移预警 · 转诊断', en: 'P7 · IV curve drift warning · forwarded to Diagnose', sev: 'mid' },
 ];
 
 // Recommended quick prompts for the right-side dispatch console
 const QUICK_PROMPTS = [
-  { a: 'ops',   t: '生成今日 iRun 日报' },
-  { a: 'query', t: '本月各电站 PR 排名？' },
-  { a: 'warn',  t: '巡查 P1 全部组串效能' },
-  { a: 'insp',  t: '为 P1 编排明日无人机巡检' },
-  { a: 'sched', t: '合并 P1、P5 的 3 张工单' },
-  { a: 'safe',  t: '检视未来 24h 高风险作业' },
+  { a: 'ops',   t: '生成今日 iRun 日报',         en: 'Generate today\'s iRun report' },
+  { a: 'query', t: '本月各电站 PR 排名？',         en: 'Rank this month\'s PR by plant' },
+  { a: 'warn',  t: '巡查 P1 全部组串效能',         en: 'Audit all string efficiency at P1' },
+  { a: 'insp',  t: '为 P1 编排明日无人机巡检',      en: 'Schedule tomorrow\'s UAV inspection at P1' },
+  { a: 'sched', t: '合并 P1、P5 的 3 张工单',       en: 'Merge 3 tickets across P1 & P5' },
+  { a: 'safe',  t: '检视未来 24h 高风险作业',       en: 'Review high-risk jobs in next 24h' },
 ];
 
 window.IRUN = {
