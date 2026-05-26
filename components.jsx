@@ -199,32 +199,147 @@ function EventStream({focusPlant, scenarioEvents, onCollapse}){
 
 // ──────────────────────────────────────────────────────────────────────
 // Dispatch / chat panel (right)
+
+// Mock chat sessions — full multi-turn conversations
+const _SESSIONS_SEED = [
+  { id:'s_cur', t:'当前', dateLabel:'today', agent:'ops', title:'当前会话', isCurrent:true,
+    msgs:[
+      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
+      { role:'agent', agent:'ops', text:'今日 06:00 ~ 现在，3 站托管运行良好。已自主闭环 2 起组串告警，0 起需人工介入。' },
+    ]},
+  { id:'s_h1', t:'09:42', dateLabel:'today', agent:'alert', title:'横州渔光 · 组串告警闭环',
+    msgs:[
+      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
+      { role:'user', text:'@告警 横州渔光 C03 组串又跳了，查一下' },
+      { role:'agent', agent:'alert', text:'已聚类去噪：3 条原始告警归并为 1 起组串异常事件 EVT-A203，已派发诊断。' },
+      { role:'agent', agent:'diag', text:'诊断初判：C03-12 组串 IV 偏移 0.42，疑似接线松动；建议派工现场复核。' },
+      { role:'user', text:'@排程 安排明早派单' },
+      { role:'agent', agent:'sched', text:'已排入明日 08:00 优先工单，分配给驻站员小李，预计 30 分钟闭环。' },
+      { role:'user', text:'@工单 看看历史相似工单' },
+      { role:'agent', agent:'order', text:'近 30 天该方阵共 4 起类似工单，3 起为接线松动，1 起为压块腐蚀。' },
+    ]},
+  { id:'s_h2', t:'08:15', dateLabel:'today', agent:'query', title:'今日 PR 排名速览',
+    msgs:[
+      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
+      { role:'user', text:'@问数 本月各电站 PR 排名？' },
+      { role:'agent', agent:'query', text:'本月 PR 排名 福曦#01 (85.2%) > ILP-Banten (83.9%) > 横州渔光 (82.6%) > 示范站 (81.4%)。' },
+    ]},
+  { id:'s_h3', t:'昨日 17:30', dateLabel:'earlier', agent:'sched', title:'Banten-A 巡检调度',
+    msgs:[
+      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
+      { role:'user', text:'@排程 Banten-A 明天需要做一次组串巡检' },
+      { role:'agent', agent:'sched', text:'已编排 UAV-03 明日 08:30 巡检 · 覆盖 22 个方阵 · 预计 142 分钟。' },
+      { role:'user', text:'@巡检 巡检覆盖率？' },
+      { role:'agent', agent:'insp', text:'本周累计巡检覆盖率 87%，剩余 13% 计划本周末完成。' },
+      { role:'user', text:'@安全 巡检期间是否有作业冲突？' },
+      { role:'agent', agent:'safe', text:'08:30-11:00 时段无登高作业冲突，可安全执行无人机巡检。' },
+      { role:'user', text:'@工单 自动派单' },
+      { role:'agent', agent:'order', text:'已生成工单 W-2625-007，派发驻站员李工，已通知。' },
+    ]},
+  { id:'s_h4', t:'昨日 14:08', dateLabel:'earlier', agent:'pv', title:'光伏组件 SOP 检索',
+    msgs:[
+      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
+      { role:'user', text:'@光伏 组件绝缘检测的标准流程？' },
+      { role:'agent', agent:'pv', text:'SOP-PV-211 组件绝缘检测，包含 6 步关键操作与 3 项安全注意，是否查看完整文档？' },
+      { role:'user', text:'是的，发给我' },
+      { role:'agent', agent:'pv', text:'已发送至工作台 → 文档中心 → SOP-PV-211。建议巡检前阅读。' },
+    ]},
+  { id:'s_h5', t:'昨日 10:42', dateLabel:'earlier', agent:'safe', title:'高风险作业 24h 检视',
+    msgs:[
+      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
+      { role:'user', text:'@安全 未来 24h 高风险作业有哪些？' },
+      { role:'agent', agent:'safe', text:'未来 24h：3 项登高作业、1 项带电检修；已对应推送防护建议。' },
+      { role:'user', text:'@安全 带电检修是哪个站？' },
+      { role:'agent', agent:'safe', text:'示范站 INV-04 直流侧检修，作业人 2 名，已要求落实双人监护。' },
+      { role:'user', text:'@排程 调整时间到下午' },
+      { role:'agent', agent:'sched', text:'已与现场协调，作业时间调整至 14:00-16:00，避开早间发电高峰。' },
+    ]},
+  { id:'s_h6', t:'05-24 16:20', dateLabel:'earlier', agent:'diag', title:'东源 #01 IV 偏移诊断',
+    msgs:[
+      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
+      { role:'user', text:'@诊断 东源 #01 最近 IV 曲线异常' },
+      { role:'agent', agent:'diag', text:'近 7 天检测到 5 处 IV 偏移，主要集中在 P3 方阵 INV-04 ~ INV-06。' },
+      { role:'user', text:'@诊断 给出可能原因' },
+      { role:'agent', agent:'diag', text:'可能原因：① 组件 PID 衰减 (置信 64%)；② 组件遮挡 (置信 22%)；③ 接线箱接触不良 (置信 14%)。' },
+      { role:'user', text:'@巡检 安排现场排查' },
+      { role:'agent', agent:'insp', text:'UAV 巡检已安排明日 09:00，结合 IV 数据生成定向检测路径。' },
+      { role:'user', text:'@光伏 PID 治理方案' },
+      { role:'agent', agent:'pv', text:'推荐夜间正向偏压治理，连续 7 晚每晚 8h；预计恢复 75% 衰减功率。' },
+    ]},
+  { id:'s_h7', t:'05-24 09:00', dateLabel:'earlier', agent:'ops', title:'iRun 日报生成 · 周一',
+    msgs:[
+      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
+      { role:'agent', agent:'ops', text:'周一日报已生成：可用率 99.42%、PR 82.8%、人均工单 3.5 张，3 项 KPI 风险已转工单。' },
+    ]},
+  { id:'s_h8', t:'05-23 11:15', dateLabel:'earlier', agent:'order', title:'工单合并方案审议',
+    msgs:[
+      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
+      { role:'user', text:'@工单 今日待处理工单太分散，能不能合并？' },
+      { role:'agent', agent:'order', text:'今日 14 张工单可合并为 8 张，节省 38 km、56 min。' },
+      { role:'user', text:'@排程 出一份合并方案' },
+      { role:'agent', agent:'sched', text:'合并方案已生成 · 1 人 1 车 1 趟 · 节省里程 38 km、节省时间 56 min。' },
+      { role:'user', text:'@安全 合并后作业是否安全' },
+      { role:'agent', agent:'safe', text:'合并后无作业冲突，已审核通过。' },
+      { role:'user', text:'@工单 按方案下发' },
+      { role:'agent', agent:'order', text:'14 张工单已重排为 8 张派单，已通知现场人员。' },
+      { role:'user', text:'@运营 跟踪结果' },
+      { role:'agent', agent:'ops', text:'已开启工单闭环跟踪，每 30 分钟同步进度至本对话。' },
+      { role:'user', text:'@运营 完成情况' },
+      { role:'agent', agent:'ops', text:'截至 17:00，8 张工单已闭环 7 张，1 张延期至明早。' },
+    ]},
+];
+
 function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, onCollapse}){
-  const [messages, setMessages] = useState([
-    { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-    { role:'agent', agent:'ops', text:'今日 06:00 ~ 现在，3 站托管运行良好。已自主闭环 2 起组串告警，0 起需人工介入。' },
-  ]);
+  const [sessions, setSessions] = useState(_SESSIONS_SEED);
+  const [currentId, setCurrentId] = useState('s_cur');
   const [input, setInput] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
   const bodyRef = useRef(null);
   const inputRef = useRef(null);
   const l = useLang(); const zh = l !== 'en';
 
-  // Mock chat history sessions
-  const historySessions = [
-    { id:'h1', t:'09:42', title:'横州渔光 · 组串告警闭环', agent:'alert', msgs:8, today:true },
-    { id:'h2', t:'08:15', title:'今日 PR 排名速览', agent:'query', msgs:3, today:true },
-    { id:'h3', t:'昨日 17:30', title:'Banten-A 巡检调度', agent:'sched', msgs:12, today:false },
-    { id:'h4', t:'昨日 14:08', title:'光伏组件 SOP 检索', agent:'pv', msgs:5, today:false },
-    { id:'h5', t:'昨日 10:42', title:'高风险作业 24h 检视', agent:'safe', msgs:7, today:false },
-    { id:'h6', t:'05-24 16:20', title:'东源 #01 IV 偏移诊断', agent:'diag', msgs:9, today:false },
-    { id:'h7', t:'05-24 09:00', title:'iRun 日报生成 · 周一', agent:'ops', msgs:2, today:false },
-    { id:'h8', t:'05-23 11:15', title:'工单合并方案审议', agent:'order', msgs:14, today:false },
-  ];
+  const currentSession = sessions.find(s => s.id === currentId) || sessions[0];
+  const messages = currentSession.msgs;
 
   useEffect(()=>{
     if(bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  },[messages]);
+  },[messages, currentId]);
+
+  // Filter + sort history list
+  const filteredSessions = sessions.filter(s => {
+    if (!searchQ) return true;
+    const q = searchQ.toLowerCase();
+    return s.title.toLowerCase().includes(q) ||
+           s.msgs.some(m => (m.text||'').toLowerCase().includes(q));
+  });
+
+  function selectSession(id){
+    setCurrentId(id);
+    setHistoryOpen(false);
+    setInput('');
+    onSelectAgent?.(null);
+  }
+
+  function newSession(){
+    const id = 's_' + Date.now();
+    const now = new Date();
+    const p = n => String(n).padStart(2,'0');
+    const tLabel = `${p(now.getHours())}:${p(now.getMinutes())}`;
+    const fresh = {
+      id, t: tLabel, dateLabel:'today', agent:'ops',
+      title: zh?'新会话':'New Session', isCurrent:true,
+      msgs:[
+        { role:'sys', text: zh?'已开始新会话 · iRun 数字团队待命':'New session started · iRun team standby' },
+      ],
+    };
+    setSessions(prev => [fresh, ...prev]);
+    setCurrentId(id);
+    setHistoryOpen(false);
+    setInput('');
+    onSelectAgent?.(null);
+    setTimeout(()=>{ inputRef.current?.focus(); }, 50);
+  }
 
   // When an agent is selected, auto-prefill `@<agent> ` into the input and focus it
   useEffect(()=>{
@@ -249,10 +364,19 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
   const send = (text, agentId) => {
     if(!text.trim()) return;
     const targetId = agentId || selectedAgent || 'ops';
-    setMessages(prev => [...prev,
-      { role:'user', text },
-      { role:'agent', agent: targetId, text: respondTo(text, targetId, focusPlant) }
-    ]);
+    const userMsg = { role:'user', text };
+    const agentMsg = { role:'agent', agent: targetId, text: respondTo(text, targetId, focusPlant) };
+    setSessions(prev => prev.map(s => {
+      if (s.id !== currentId) return s;
+      const newMsgs = [...s.msgs, userMsg, agentMsg];
+      // Auto-update title from first user message
+      const isFirstUser = !s.msgs.some(m => m.role === 'user');
+      const cleanText = text.replace(/^@\S+\s*/, '').trim();
+      const newTitle = isFirstUser && cleanText
+        ? cleanText.slice(0, 18) + (cleanText.length>18?'…':'')
+        : s.title;
+      return { ...s, msgs: newMsgs, title: newTitle, agent: targetId };
+    }));
     setInput('');
     onSelectAgent?.(null);
   };
@@ -284,15 +408,17 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
       {historyOpen && (
         <div className="history-flyout">
           <div className="hf-hd">
-            <span><T z="对话历史" e="Chat History"/></span>
+            <span><T z="对话历史" e="Chat History"/> <em className="hf-count">{sessions.length}</em></span>
             <button className="hf-close" onClick={()=>setHistoryOpen(false)}>×</button>
           </div>
           <div className="hf-search">
-            <input placeholder={zh?'搜索历史会话…':'Search history…'}/>
+            <input placeholder={zh?'搜索历史会话…':'Search history…'}
+                   value={searchQ}
+                   onChange={e=>setSearchQ(e.target.value)}/>
           </div>
           <div className="hf-list">
             {['today','earlier'].map(group=>{
-              const items = historySessions.filter(s => group==='today' ? s.today : !s.today);
+              const items = filteredSessions.filter(s => s.dateLabel === group);
               if (!items.length) return null;
               return (
                 <div key={group} className="hf-group">
@@ -300,22 +426,31 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
                   {items.map(s=>{
                     const ag = _ABI[s.agent];
                     const cat = ag && _CATS[ag.cat];
+                    const msgCount = s.msgs.filter(m => m.role !== 'sys').length;
+                    const active = s.id === currentId;
                     return (
-                      <div key={s.id} className="hf-item" onClick={()=>setHistoryOpen(false)}>
+                      <div key={s.id}
+                           className={`hf-item${active?' active':''}`}
+                           onClick={()=>selectSession(s.id)}
+                           title={s.title}>
                         <span className="hf-tag" style={{color:cat?.color, borderColor:(cat?.color||'#666')+'55'}}>{ag?.code}</span>
                         <div className="hf-info">
                           <div className="hf-title">{s.title}</div>
-                          <div className="hf-meta">{s.t} · {s.msgs} {zh?'条':'msgs'}</div>
+                          <div className="hf-meta">{s.t} · {msgCount} {zh?'条':'msgs'}</div>
                         </div>
+                        {active && <span className="hf-active-dot"/>}
                       </div>
                     );
                   })}
                 </div>
               );
             })}
+            {filteredSessions.length === 0 && (
+              <div className="hf-empty">{zh?'无匹配会话':'No matches'}</div>
+            )}
           </div>
           <div className="hf-foot">
-            <button className="hf-newbtn" onClick={()=>setHistoryOpen(false)}>+ {zh?'新建会话':'New Session'}</button>
+            <button className="hf-newbtn" onClick={newSession}>+ {zh?'新建会话':'New Session'}</button>
           </div>
         </div>
       )}

@@ -434,7 +434,24 @@ body{
   display:flex;align-items:flex-start;gap:8px;padding:8px 12px;cursor:pointer;
   border-left:2px solid transparent;transition:all .12s ease;
 }
+.hf-item{position:relative}
 .hf-item:hover{background:rgba(34,211,238,0.08);border-left-color:var(--cyan)}
+.hf-item.active{background:rgba(34,211,238,0.12);border-left-color:var(--cyan)}
+.hf-item.active .hf-title{color:var(--cyan)}
+.hf-active-dot{
+  position:absolute;top:50%;right:8px;transform:translateY(-50%);
+  width:6px;height:6px;border-radius:50%;background:var(--cyan);
+  box-shadow:0 0 6px var(--cyan);
+}
+.hf-count{
+  font-style:normal;font-family:var(--font-mono);font-size:9.5px;
+  color:var(--cyan);background:rgba(34,211,238,0.12);
+  padding:1px 5px;border-radius:8px;margin-left:6px;letter-spacing:0.06em;
+}
+.hf-empty{
+  text-align:center;padding:30px 12px;color:var(--text-mute);
+  font-size:11px;letter-spacing:0.06em;
+}
 .hf-tag{
   font-family:var(--font-display);font-size:9px;font-weight:600;letter-spacing:0.1em;
   padding:2px 5px;border:1px solid;border-radius:2px;flex-shrink:0;margin-top:1px;
