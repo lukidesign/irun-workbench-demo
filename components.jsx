@@ -537,7 +537,6 @@ function AgentModal({agentId, onClose, busyMap}){
 function ModeStrip({mode, onChange}){
   const l = useLang(); const zh = l !== 'en';
   const modes = [
-    {id:'map',   ic:'🗺', lb: zh?'地图模式':'Map Mode'},
     {id:'map2',  ic:'🌆', lb: zh?'地图模式2':'Map Mode 2'},
     {id:'img2',  ic:'▤',  lb: zh?'图片模式2':'Img Mode 2'},
   ];

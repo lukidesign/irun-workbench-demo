@@ -33,7 +33,7 @@ function App(){
   };
   const [tenantIdx, setTenantIdx] = useState(0);
   const tenant = APP_TENANTS[tenantIdx];
-  const [viewMode, setViewMode] = useState('map'); // map | map2 | img2
+  const [viewMode, setViewMode] = useState('map2'); // map2 | img2
   const [map2SubMode, setMap2SubMode] = useState('show'); // show | roam
   const [lang, setLang] = useState(()=>{ try{ return localStorage.getItem('irun:lang')||'zh'; }catch(e){ return 'zh'; } });
   const toggleLang = () => setLang(l => {
