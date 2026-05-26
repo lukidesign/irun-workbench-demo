@@ -39,6 +39,23 @@ function TopBar({focusPlant, plants, onPlantChange, tenant, tenantIdx, onTenant,
   const clock = useClock();
   const zh = lang !== 'en';
   const [plantPickerOpen, setPlantPickerOpen] = useState(false);
+  const pickerRef = React.useRef(null);
+  // Click-outside + ESC to close the plant picker
+  React.useEffect(()=>{
+    if(!plantPickerOpen) return;
+    const onDown = e => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setPlantPickerOpen(false);
+      }
+    };
+    const onKey = e => { if(e.key==='Escape') setPlantPickerOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return ()=>{
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [plantPickerOpen]);
   const k = focusPlant ? {
     cap: focusPlant.capacity, pwr: focusPlant.power, gen: focusPlant.gen, al: focusPlant.alerts,
     plants: 1, risk: focusPlant.risk === 'high' ? 1 : 0,
@@ -69,8 +86,9 @@ function TopBar({focusPlant, plants, onPlantChange, tenant, tenantIdx, onTenant,
         <span className={`crumb ${!focusPlant?'active':''}`} onClick={onBack} style={{cursor:focusPlant?'pointer':'default'}}>{zh?'总览':'Overview'}</span>
         {focusPlant && <>
           <span className="crumb-sep">/</span>
-          <div className="crumb-picker" onMouseLeave={()=>setPlantPickerOpen(false)}>
-            <span className="crumb active picker-btn" onClick={()=>setPlantPickerOpen(o=>!o)}>
+          <div className="crumb-picker" ref={pickerRef}>
+            <span className={`crumb active picker-btn${plantPickerOpen?' open':''}`}
+                  onClick={()=>setPlantPickerOpen(o=>!o)}>
               {focusPlant.name}
               <span className={`picker-caret${plantPickerOpen?' open':''}`}>▼</span>
             </span>
