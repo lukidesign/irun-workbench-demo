@@ -35,7 +35,7 @@ function fmtDate(d){
 
 // ──────────────────────────────────────────────────────────────────────
 // Top bar
-function TopBar({focusPlant, plants, onPlantChange, tenant, tenantIdx, onTenant, onBack, lang, onLang}){
+function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTenant, onBack, lang, onLang}){
   const clock = useClock();
   const zh = lang !== 'en';
   const [plantPickerOpen, setPlantPickerOpen] = useState(false);
@@ -56,12 +56,13 @@ function TopBar({focusPlant, plants, onPlantChange, tenant, tenantIdx, onTenant,
       document.removeEventListener('keydown', onKey);
     };
   }, [plantPickerOpen]);
+  const A = agg || _AGG;
   const k = focusPlant ? {
     cap: focusPlant.capacity, pwr: focusPlant.power, gen: focusPlant.gen, al: focusPlant.alerts,
     plants: 1, risk: focusPlant.risk === 'high' ? 1 : 0,
   } : {
-    cap: _AGG.capacity, pwr: _AGG.power, gen: _AGG.gen, al: _AGG.alerts,
-    plants: _AGG.plants, risk: _AGG.risk,
+    cap: A.capacity, pwr: A.power, gen: A.gen, al: A.alerts,
+    plants: A.plants, risk: A.risk,
   };
   const util = (k.pwr / k.cap * 100).toFixed(1);
 
@@ -617,6 +618,7 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
       <div className="composer">
         <input
           ref={inputRef}
+          style={targetAgent ? {'--ph-color': _CATS[targetAgent.cat].color} : undefined}
           placeholder={targetAgent
             ? (zh ? `@${targetAgent.short} 输入指令…` : `@${targetAgent.en} type command…`)
             : (zh ? '@智能体 输入指令… 例如：@排程 合并今日工单' : '@agent type command… e.g. @Schedule merge today\'s tickets')}
@@ -921,34 +923,67 @@ function AgentTokenPanel({ busyMap, onOpen }) {
   const l = useLang(); const zh = l !== 'en';
   const N = 24; // points per sparkline
 
+  // Per-agent 24h shape functions → distinct working rhythm per agent.
+  // Each returns a relative intensity in [0, 1] for hour h ∈ [0, 23].
+  const SHAPES = {
+    // 告警:7×24 高基线监控,夜间也有活动,小幅波动
+    alert: h => 0.58 + 0.22 * Math.sin((h - 2) / 24 * Math.PI * 2) + 0.08 * Math.cos(h / 3),
+    // 工单:7-21 单大峰,午后最高
+    order: h => (h >= 7 && h <= 21) ? 0.32 + 0.6 * Math.sin((h - 7) / 14 * Math.PI) : 0.1,
+    // 排程:早高峰(8h) + 傍晚峰(17h) 双峰
+    sched: h => 0.1 + 0.55 * Math.exp(-((h - 8) ** 2) / 8) + 0.78 * Math.exp(-((h - 17) ** 2) / 10),
+    // 预警:白天宽峰
+    warn:  h => (h >= 6 && h <= 20) ? 0.26 + 0.62 * Math.sin((h - 6) / 14 * Math.PI) : 0.1,
+    // 巡检:正午锐峰(无人机白天作业)
+    insp:  h => Math.max(0.05, 0.92 * Math.exp(-((h - 12) ** 2) / 16)),
+    // 诊断:白天主峰 + 上午次峰
+    diag:  h => 0.16 + 0.55 * Math.max(0, Math.sin((h - 6) / 12 * Math.PI)) + 0.22 * Math.max(0, Math.sin((h - 9) / 4 * Math.PI - 0.4)),
+    // 安全:全天偏稳,白天小幅抬升
+    safe:  h => (h >= 7 && h <= 19) ? 0.4 + 0.25 * Math.sin((h - 7) / 12 * Math.PI) : 0.24,
+    // 光伏助手:平稳波浪,昼夜差不大
+    pv:    h => 0.46 + 0.18 * Math.sin((h - 4) / 24 * Math.PI * 2) + 0.12 * Math.sin(h / 2.5),
+    // 问数:9-18 工作时段聚集
+    query: h => (h >= 9 && h <= 18) ? 0.28 + 0.62 * Math.sin((h - 9) / 9 * Math.PI) : 0.07,
+    // 运营:平稳缓变,白天微高
+    ops:   h => 0.38 + 0.22 * Math.cos((h - 11) / 12 * Math.PI),
+  };
+  function shapeFor(id, h) {
+    const f = SHAPES[id] || SHAPES.ops;
+    return Math.max(0.04, Math.min(1, f(h)));
+  }
+
+  // Each agent's token K-value drives its absolute curve height.
+  const TOK_VALS = _AGENTS.map(a => parseFloat(a.metrics.tokens) || 0);
+  const GLOBAL_MAX_TOK = Math.max(...TOK_VALS, 1);
+
   // Deterministic seeded RNG → so each agent starts with a stable curve
   function seededRng(seed){
     let s = seed >>> 0;
     return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
   }
-  function genSpark(seed) {
+  function genSpark(agent, seed) {
     const rng = seededRng(seed);
     const pts = [];
     for (let h = 0; h < N; h++) {
-      const base = (h >= 8 && h <= 19)
-        ? 0.3 + 0.65 * Math.sin((h - 8) / 11 * Math.PI)
-        : 0.08;
-      pts.push(Math.max(0.04, Math.min(1, base + (rng() - 0.5) * 0.3)));
+      const base = shapeFor(agent.id, h);
+      pts.push(Math.max(0.03, Math.min(1, base + (rng() - 0.5) * 0.08)));
     }
     return pts;
   }
 
   // Each agent owns its own live spark array, evolving over time
-  const [sparks, setSparks] = useState(() => _AGENTS.map((_, i) => genSpark(i * 31337 + 7)));
+  const [sparks, setSparks] = useState(() => _AGENTS.map((a, i) => genSpark(a, i * 31337 + 7)));
 
   useEffect(() => {
     const id = setInterval(() => {
       setSparks(prev => prev.map((arr, i) => {
-        // shift left, append new value influenced by previous + noise + per-agent phase
-        const phase = (Date.now() / 1000 + i * 1.7) * 0.4;
-        const wave = 0.45 + 0.4 * Math.sin(phase) + (Math.random() - 0.5) * 0.18;
+        const a = _AGENTS[i];
+        // simulated clock hour advances slowly; each agent samples its own shape
+        const hSim = ((Date.now() / 1000) / 3 + i * 0.7) % 24;
+        const shape = shapeFor(a.id, hSim);
+        const noise = (Math.random() - 0.5) * 0.1;
         const last = arr[arr.length - 1];
-        const next = Math.max(0.04, Math.min(1, last * 0.55 + wave * 0.45));
+        const next = Math.max(0.03, Math.min(1, shape * 0.7 + last * 0.2 + noise + 0.05));
         return [...arr.slice(1), next];
       }));
     }, 700);
@@ -976,8 +1011,12 @@ function AgentTokenPanel({ busyMap, onOpen }) {
             const mx = Math.max(...spark);
             const peakH = spark.indexOf(mx);
             const color = busy ? '#22d3ee' : cat.color;
+            // Curve height ∝ this agent's token volume vs the global max.
+            // Floor at 0.18 so the tiniest agent is still visible.
+            const tokVal = parseFloat(a.metrics.tokens) || 0;
+            const agentScale = Math.max(0.18, tokVal / GLOBAL_MAX_TOK);
             const polyPts = spark.map((v, idx) =>
-              `${(idx / (N-1)) * W},${H - 2 - (v / mx) * (H - 5)}`
+              `${(idx / (N-1)) * W},${H - 2 - v * agentScale * (H - 5)}`
             ).join(' ');
             const areaPts = `0,${H} ${polyPts} ${W},${H}`;
             return (
@@ -986,7 +1025,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
                    style={{'--cat-color': color}}
                    onClick={() => onOpen(a.id)}>
                 <div className="tc-top">
-                  <RobotAvatar agent={a} size={22} glow={busy}/>
+                  <RobotAvatar agent={a} size={32} glow={busy}/>
                   <div className="tc-info">
                     <span className="tc-name">{zh ? a.short : a.en}</span>
                     <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{busy ? (zh?'● 运行':'● Active') : (zh?'○ 空闲':'○ Idle')}</span>

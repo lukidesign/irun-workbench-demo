@@ -124,7 +124,7 @@ body{
 }
 .agents-rail-hd{
   font-family:var(--font-display);
-  font-size:11px;letter-spacing:0.28em;text-transform:uppercase;
+  font-size:12px;letter-spacing:0.28em;text-transform:uppercase;
   color:var(--text);font-weight:600;
   text-align:center;padding:10px 10px 8px;border-bottom:1px solid var(--line);
   line-height:1.4;flex-shrink:0;
@@ -153,8 +153,8 @@ body{
   border-color:rgba(34,211,238,0.4);
 }
 .agent-tile.off{opacity:0.35}
-.agent-tile .robot-wrap{position:relative;width:36px;height:36px;display:grid;place-items:center}
-.agent-tile .robot-wrap svg{width:36px;height:36px}
+.agent-tile .robot-wrap{position:relative;width:42px;height:42px;display:grid;place-items:center}
+.agent-tile .robot-wrap svg{width:42px;height:42px}
 .agent-tile .badge-count{
   position:absolute;top:-3px;right:-5px;
   min-width:16px;height:16px;border-radius:8px;
@@ -172,12 +172,14 @@ body{
   animation:wrk-pulse 1.4s ease-in-out infinite}
 @keyframes wrk-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
 .agent-tile .status-dot.off{background:#475569}
-.agent-tile-name{text-align:center;line-height:1.1}
+.agent-tile-name{text-align:center;line-height:1.1;width:100%;min-width:0}
 .agent-tile-name .nm-en{
-  font-family:var(--font-display);font-size:10.5px;color:#fff;font-weight:600;letter-spacing:0.04em;
+  font-family:var(--font-display);font-size:12px;color:#fff;font-weight:600;letter-spacing:0.04em;
 }
 .agent-tile-name .nm-cn{
-  font-size:9.5px;color:var(--text-dim);letter-spacing:0.08em;margin-top:1px;
+  font-size:10px;color:var(--text-dim);letter-spacing:0.08em;margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:100%;
 }
 .agent-tile.active .nm-cn{color:#fff}
 
@@ -603,7 +605,7 @@ body{
   flex:1;background:rgba(4,8,18,0.6);border:1px solid var(--line);color:var(--text);
   padding:8px 10px;font-family:inherit;font-size:12px;outline:none;
 }
-.composer input::placeholder{color:var(--text-mute)}
+.composer input::placeholder{color:var(--ph-color, var(--text-mute));opacity:0.85}
 .composer input:focus{border-color:var(--cyan)}
 .composer button{
   border:1px solid var(--cyan);background:rgba(34,211,238,0.08);color:var(--cyan);
@@ -657,12 +659,11 @@ body{
 }
 .pid-card:hover::before,.pid-card:hover::after{border-color:var(--cyan)}
 
-.pid-c-kpi{flex:0 0 320px}
-.pid-c-team{flex:0 0 250px}
-.pid-c-log{flex:0 0 310px}
-.pid-c-pv{flex:0 0 250px}
-.pid-c-scene{flex:0 0 290px}
-.pid-c-token{flex:1 1 240px;min-width:240px}
+.pid-c-kpi{flex:1 1 320px;min-width:280px}
+.pid-c-team{flex:1 1 250px;min-width:220px}
+.pid-c-log{flex:1 1 310px;min-width:260px}
+.pid-c-scene{flex:1 1 290px;min-width:240px}
+.pid-c-token{flex:1 1 240px;min-width:220px}
 
 /* card header */
 .pid-h{
@@ -932,7 +933,7 @@ body{
 .token-card{
   flex:0 0 280px;
   background:rgba(6,10,22,0.72);border:1px solid rgba(34,211,238,0.1);
-  border-left:2px solid var(--cat-color);border-radius:2px;
+  border-radius:2px;
   padding:5px 7px 4px;cursor:pointer;
   display:flex;flex-direction:column;gap:3px;
   transition:border-color .15s, background .15s, transform .15s;position:relative;overflow:hidden;
@@ -941,15 +942,15 @@ body{
 .token-card.busy{border-color:var(--cyan);box-shadow:0 0 8px rgba(34,211,238,0.25)}
 .tc-top{display:flex;align-items:center;gap:5px}
 .tc-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.tc-name{font-family:var(--font-display);font-size:11px;color:#fff;font-weight:600;
+.tc-name{font-family:var(--font-display);font-size:12px;color:#fff;font-weight:600;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tc-st{font-family:var(--font-mono);font-size:9px}
+.tc-st{font-family:var(--font-mono);font-size:12px}
 .tc-st.work{color:var(--cyan)}.tc-st.idle{color:var(--text-mute)}
-.tc-tok{font-family:var(--font-mono);font-size:11px;color:var(--cat-color);font-weight:700;flex-shrink:0}
+.tc-tok{font-family:var(--font-mono);font-size:13px;color:var(--cat-color);font-weight:700;flex-shrink:0}
 .tc-spark{width:100%;flex:1;min-height:18px;display:block}
 .tc-spark polyline,.tc-spark polygon{transition:all .6s ease-out}
 .tc-foot{display:flex;justify-content:space-between;
-  font-family:var(--font-mono);font-size:9px;color:var(--text-mute)}
+  font-family:var(--font-mono);font-size:11px;color:var(--text-mute)}
 
 /* mini map */
 .mm-canvas{
@@ -1198,6 +1199,74 @@ body{
 @keyframes pin-ring{
   0%{transform:scale(1);opacity:0.5}
   100%{transform:scale(2.2);opacity:0}
+}
+
+/* ------ patrol robots (map2 show mode) ------ */
+.patrol-robot{
+  position:absolute;
+  width:54px;height:54px;
+  pointer-events:none;
+  z-index:6;
+  filter:drop-shadow(0 0 8px rgba(34,211,238,0.65)) drop-shadow(0 0 16px rgba(34,211,238,0.35));
+  will-change:left,top,transform;
+}
+.patrol-robot img{
+  width:100%;height:100%;object-fit:contain;
+  transform:translateY(-2px);
+  animation:robot-bob 0.7s ease-in-out infinite;
+}
+.patrol-robot-shadow{
+  position:absolute;left:50%;bottom:-4px;
+  width:34px;height:8px;
+  transform:translateX(-50%);
+  background:radial-gradient(ellipse 50% 50% at 50% 50%, rgba(34,211,238,0.55), transparent 70%);
+  filter:blur(2px);
+  animation:robot-shadow 0.7s ease-in-out infinite;
+}
+@keyframes robot-bob{
+  0%,100%{transform:translateY(-2px)}
+  50%{transform:translateY(-6px)}
+}
+@keyframes robot-shadow{
+  0%,100%{opacity:0.9;transform:translateX(-50%) scale(1)}
+  50%{opacity:0.55;transform:translateX(-50%) scale(0.78)}
+}
+
+/* path 1 — left solar field (横州渔光) */
+.patrol-robot-1{
+  animation:patrol-path-1 14s linear infinite;
+}
+@keyframes patrol-path-1{
+  0%   {left:10%;top:46%}
+  20%  {left:18%;top:42%}
+  40%  {left:22%;top:48%}
+  60%  {left:19%;top:54%}
+  80%  {left:12%;top:52%}
+  100% {left:10%;top:46%}
+}
+
+/* path 2 — center-lower solar panels (东源#01 下方) */
+.patrol-robot-2{
+  animation:patrol-path-2 16s linear infinite;
+}
+@keyframes patrol-path-2{
+  0%   {left:38%;top:76%}
+  25%  {left:48%;top:73%}
+  50%  {left:56%;top:78%}
+  75%  {left:48%;top:82%}
+  100% {left:38%;top:76%}
+}
+
+/* path 3 — right side (Cebu-N 附近) */
+.patrol-robot-3{
+  animation:patrol-path-3 15s linear infinite;
+}
+@keyframes patrol-path-3{
+  0%   {left:80%;top:58%}
+  25%  {left:88%;top:60%}
+  50%  {left:90%;top:67%}
+  75%  {left:82%;top:68%}
+  100% {left:80%;top:58%}
 }
 
 /* ------ plant detail overlay ------ */
@@ -1467,6 +1536,13 @@ body{
 .skill-modal-stat{display:flex;flex-direction:column;align-items:center;gap:1px}
 .skill-modal-stat .sv{font-family:var(--font-mono);font-size:18px;color:var(--cyan);font-weight:700}
 .skill-modal-stat .sl{font-size:9.5px;color:var(--text-mute);letter-spacing:0.1em}
+.modal-close{
+  width:30px;height:30px;border:1px solid var(--line);background:transparent;
+  display:grid;place-items:center;color:var(--text-dim);
+  cursor:pointer;font-family:var(--font-display);font-size:14px;line-height:1;
+  padding:0;transition:all .15s ease;
+}
+.modal-close:hover{border-color:var(--rose);color:var(--rose)}
 .skill-modal-toolbar{
   display:flex;align-items:center;gap:10px;
   padding:10px 20px;border-bottom:1px solid var(--line);flex-shrink:0;

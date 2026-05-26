@@ -89,24 +89,30 @@ function PlantsMap({focusId, onFocus}){
 }
 
 // Map2Overlay — floating plant pins for map2 (city background) mode
-// Positions are % of full 1920×1080 workbench canvas
-const MAP2_PINS = [
-  { id: 'p7', x: '12%',  y: '40%' },   // left solar field
-  { id: 'p3', x: '27%',  y: '55%' },   // center-left lower
-  { id: 'p1', x: '41%',  y: '68%' },   // 东源 #01 — small panel below
-  { id: 'p5', x: '42%',  y: '37%' },   // center-upper building
-  { id: 'p2', x: '62%',  y: '55%' },   // Banten-A — building cluster lower
-  { id: 'p6', x: '75%',  y: '53%' },   // right lower
-  { id: 'p4', x: '82%',  y: '52%' },   // Cebu-N — building lower-left of original
-];
-
-function Map2Overlay({ focusId, onFocus }) {
+// Each plant carries its own mapX / mapY (% of canvas) in data.js,
+// so we just filter by current tenant and render in place.
+function Map2Overlay({ focusId, onFocus, subMode, tenantId }) {
   const zh = React.useContext(window.IRUN_UI?.LangCtx || React.createContext('zh')) !== 'en';
+  const visible = _MAP_PLANTS.filter(p => (!tenantId || p.tenant === tenantId) && p.mapX && p.mapY);
   return (
     <div className="map2-overlay">
-      {MAP2_PINS.map((pos, i) => {
-        const plant = _MAP_PLANTS.find(p => p.id === pos.id);
-        if (!plant) return null;
+      {subMode === 'show' && (
+        <>
+          <div className="patrol-robot patrol-robot-1" aria-hidden="true">
+            <img src="IRunRobot.png" alt=""/>
+            <div className="patrol-robot-shadow"/>
+          </div>
+          <div className="patrol-robot patrol-robot-2" aria-hidden="true">
+            <img src="IRunRobot.png" alt=""/>
+            <div className="patrol-robot-shadow"/>
+          </div>
+          <div className="patrol-robot patrol-robot-3" aria-hidden="true">
+            <img src="IRunRobot.png" alt=""/>
+            <div className="patrol-robot-shadow"/>
+          </div>
+        </>
+      )}
+      {visible.map((plant, i) => {
         const colour = plant.risk==='high' ? '#f87171' : plant.risk==='mid' ? '#fbbf24' : '#22d3ee';
         const statusLabel = plant.risk==='high'
           ? (zh?'⚠ 高风险':'⚠ High')
@@ -118,7 +124,7 @@ function Map2Overlay({ focusId, onFocus }) {
             key={plant.id}
             className={`map2-pin${focusId===plant.id ? ' active' : ''}`}
             style={{
-              left: pos.x, top: pos.y,
+              left: plant.mapX, top: plant.mapY,
               '--pin-color': colour,
               animationDelay: `${i * 0.45}s`
             }}

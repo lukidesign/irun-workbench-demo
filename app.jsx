@@ -5,7 +5,7 @@ const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDo
 const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
 const { PlantDetail, PlantInlineDock, useScenarioStepping } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
-const { PLANTS: APP_PLANTS, TENANTS: APP_TENANTS, AGENTS: APP_AGENTS, AGENT_BY_ID: APP_ABI } = window.IRUN;
+const { PLANTS: APP_PLANTS, TENANTS: APP_TENANTS, AGENTS: APP_AGENTS, AGENT_BY_ID: APP_ABI, aggregateOf: APP_AGG_OF } = window.IRUN;
 
 function App(){
   const [focusId, setFocusId] = useState(null);
@@ -35,6 +35,15 @@ function App(){
   const tenant = APP_TENANTS[tenantIdx];
   const [viewMode, setViewMode] = useState('map2'); // map2 | img2
   const [map2SubMode, setMap2SubMode] = useState('show'); // show | roam
+  // Switching tenant → drop focus & return to OVERVIEW
+  const onTenantChange = useCallback((idx) => {
+    setTenantIdx(idx);
+    setFocusId(null);
+    setViewMode(prev => prev === 'img2' ? 'map2' : prev);
+  }, []);
+  // Plants visible under the current tenant
+  const tenantPlants = APP_PLANTS.filter(p => p.tenant === tenant.id);
+  const tenantAgg = APP_AGG_OF ? APP_AGG_OF(tenantPlants) : { plants: tenantPlants.length, capacity:0, power:0, gen:0, alerts:0, risk:0 };
   const [lang, setLang] = useState(()=>{ try{ return localStorage.getItem('irun:lang')||'zh'; }catch(e){ return 'zh'; } });
   const toggleLang = () => setLang(l => {
     const n = l==='zh'?'en':'zh';
@@ -151,12 +160,12 @@ function App(){
       )}
       {/* map2 漫游 — video background */}
       {(viewMode === 'map2' && map2SubMode === 'roam') && (
-        <video className="scene-video-bg" src="rjgf003.mp4" autoPlay muted loop playsInline/>
+        <video className="scene-video-bg" src="manyou001.mp4" autoPlay loop playsInline/>
       )}
 
       {/* full-screen plants map / 3D scene */}
       {viewMode === 'map' && <PlantsMap focusId={focusId} onFocus={setFocusId}/>}
-      {viewMode === 'map2' && <Map2Overlay focusId={focusId} onFocus={(id)=>{ setFocusId(id); setViewMode('img2'); }}/>}
+      {viewMode === 'map2' && <Map2Overlay focusId={focusId} onFocus={(id)=>{ setFocusId(id); setViewMode('img2'); }} subMode={map2SubMode} tenantId={tenant.id}/>}
 
       {/* map2 展示/漫游 toggle */}
       {viewMode === 'map2' && (
@@ -168,7 +177,7 @@ function App(){
       {(viewMode === 'model' || viewMode === 'day' || viewMode === 'night') && <Scene3D mode={viewMode}/>}
 
       {/* top KPIs */}
-      <TopBar focusPlant={focusPlant} plants={APP_PLANTS} onPlantChange={setFocusId} tenant={tenant} tenantIdx={tenantIdx} onTenant={setTenantIdx} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang}/>
+      <TopBar focusPlant={focusPlant} plants={tenantPlants} agg={tenantAgg} onPlantChange={setFocusId} tenant={tenant} tenantIdx={tenantIdx} onTenant={onTenantChange} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang}/>
 
       {/* left + right rails over map */}
       <div className="stage">

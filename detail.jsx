@@ -403,10 +403,6 @@ function PlantInlineDock({plant, scenario, stepIdx, cur, mode, scenarioIdx, onMo
         scenario={scenario} steps={visibleSteps}
         onOpen={open('log')}/>
 
-      <PIDCardPv
-        plant={plant} scenario={scenario} stepIdx={stepIdx}
-        onOpen={open('pv')}/>
-
       <PIDCardScene
         plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur}
         activeAgentIds={activeAgentIds}
@@ -547,31 +543,6 @@ function PIDCardLog({scenario, steps, onOpen}){
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-// ── Card 4: PV array preview (12x8 with hot cells)
-function PIDCardPv({plant, scenario, stepIdx, onOpen}){
-  const zh = _useD_Lang() !== 'en';
-  const hotCells = useMemo(()=>[16, 17, 28, 29, 64, 76, 88], [plant.id]);
-  return (
-    <div className="pid-card pid-c-pv" onClick={onOpen}>
-      <div className="pid-h">
-        <span>PV-Array · 12×8</span>
-        <span className="pid-h-meta">{zh ? plant.short : (plant.name.split(/[·]/).pop() || plant.short)}</span>
-      </div>
-      <div className="pid-pv-wrap">
-        <div className="pid-pv-grid">
-          {Array.from({length:96}).map((_,i)=>{
-            const isHot = scenario.id==='A' && hotCells.includes(i) && stepIdx >= 1 && stepIdx < 16;
-            const isFixed = scenario.id==='A' && hotCells.includes(i) && stepIdx >= 16;
-            const isInsp = scenario.id==='B' && [22,23,40,55,70,84].includes(i) && stepIdx >= 3;
-            return <div key={i}
-              className={`pid-pv-cell ${isHot?'hot':''} ${isFixed?'work':''} ${isInsp?'hot':''}`}/>;
-          })}
-        </div>
       </div>
     </div>
   );
