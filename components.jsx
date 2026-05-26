@@ -686,8 +686,8 @@ function AgentDock({focusPlant, busyMap, onOpen}){
               <div className="top">
                 <div style={{flexShrink:0}}><RobotAvatar agent={a} size={28} glow={busy}/></div>
                 <div>
-                  <div className="nm">{a.name}</div>
-                  <div className="rl">{a.role}</div>
+                  <div className="nm">{zh ? a.name : a.en}</div>
+                  <div className="rl">{zh ? a.role : (a.enRole || a.role)}</div>
                 </div>
               </div>
               <div className="meta">
@@ -770,6 +770,7 @@ function QuickFuncs({focusPlant, totalTokens, busyCount}){
 // Agent modal — drill into a single agent's working pane
 function AgentModal({agentId, onClose, busyMap}){
   if(!agentId) return null;
+  const l = useLang(); const zh = l !== 'en';
   const a = _ABI[agentId];
   const cat = _CATS[a.cat];
   const isBusy = busyMap?.[agentId];
@@ -809,8 +810,8 @@ function AgentModal({agentId, onClose, busyMap}){
             <div className="profile">
               <div className="avatar">{a.code}</div>
               <div>
-                <h2>{a.name}</h2>
-                <div className="role" style={{color:cat.color}}>{cat.label} · {a.role}</div>
+                <h2>{zh ? a.name : a.en}</h2>
+                <div className="role" style={{color:cat.color}}>{cat.label} · {zh ? a.role : (a.enRole || a.role)}</div>
                 <p>{a.intro}</p>
               </div>
             </div>
@@ -946,7 +947,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
               <div className="tc-top">
                 <RobotAvatar agent={a} size={22} glow={busy}/>
                 <div className="tc-info">
-                  <span className="tc-name">{a.short}</span>
+                  <span className="tc-name">{zh ? a.short : a.en}</span>
                   <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{busy ? (zh?'● 运行':'● Active') : (zh?'○ 空闲':'○ Idle')}</span>
                 </div>
                 <span className="tc-tok">{a.metrics.tokens}</span>
@@ -1298,7 +1299,7 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
               </div>
               <div className="agent-tile-name">
                 <div className="nm-en">{zh ? a.short : a.en}</div>
-                <div className="nm-cn">{zh ? a.en : a.role}</div>
+                <div className="nm-cn">{zh ? a.en : (a.enRole || a.role)}</div>
               </div>
             </div>
           );
