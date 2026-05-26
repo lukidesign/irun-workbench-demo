@@ -29,12 +29,46 @@ function getCat(id){
   return { color:'#64748b' };
 }
 
-function PlantDetail({plant, onClose, scenarioIdx, mode, onModeChange, onScenarioChange, onStep}){
-  const scenario = _SCENARIOS[scenarioIdx];
+// ─────────────────────────────────────────────────────────────────────
+// Hook: scenario stepping — provides current step + auto-advance + loop
+function useScenarioStepping({scenarioIdx, plantId, mode, onStep, onScenarioChange}){
   const [stepIdx, setStepIdx] = useState(0);
-  const [played, setPlayed] = useState(new Set([0]));
-  const [showVideo, setShowVideo] = useState(false);
   const timersRef = useRef([]);
+  const scenario = _SCENARIOS[scenarioIdx];
+
+  useEffect(()=>{
+    if(!plantId) return;
+    if(mode !== 'auto') return;
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    setStepIdx(0);
+    onStep?.(scenario.steps[0], 0, scenario);
+
+    scenario.steps.forEach((s,i)=>{
+      if(i===0) return;
+      const id = setTimeout(()=>{
+        setStepIdx(i);
+        onStep?.(s, i, scenario);
+      }, s.t);
+      timersRef.current.push(id);
+    });
+    const last = scenario.steps[scenario.steps.length-1].t;
+    const loopId = setTimeout(()=>{
+      onScenarioChange?.((scenarioIdx+1) % _SCENARIOS.length);
+    }, last + 4000);
+    timersRef.current.push(loopId);
+
+    return ()=> timersRef.current.forEach(clearTimeout);
+  },[scenarioIdx, plantId, mode]);
+
+  const cur = scenario.steps[stepIdx];
+  return { stepIdx, cur, scenario };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PlantDetail — popup overlay (used on card click in img2 mode, or as default in other modes)
+function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx, onModeChange, onScenarioChange}){
+  const [showVideo, setShowVideo] = useState(false);
   const detailRef = useRef(null);
   const videoRef = useRef(null);
 
@@ -50,7 +84,6 @@ function PlantDetail({plant, onClose, scenarioIdx, mode, onModeChange, onScenari
 
   function openVideo(){
     setShowVideo(true);
-    // autoplay after mount
     setTimeout(()=>{ if(videoRef.current){ videoRef.current.play().catch(()=>{}); } }, 100);
   }
   function closeVideo(){
@@ -58,37 +91,7 @@ function PlantDetail({plant, onClose, scenarioIdx, mode, onModeChange, onScenari
     setShowVideo(false);
   }
 
-  // Reset and replay whenever scenario or plant changes
-  useEffect(()=>{
-    if (mode !== 'auto') return;
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [];
-    setStepIdx(0);
-    setPlayed(new Set([0]));
-    onStep?.(scenario.steps[0], 0, scenario);
-
-    scenario.steps.forEach((s,i)=>{
-      if(i===0) return;
-      const id = setTimeout(()=>{
-        setStepIdx(i);
-        setPlayed(prev => { const n = new Set(prev); n.add(i); return n; });
-        onStep?.(s, i, scenario);
-      }, s.t);
-      timersRef.current.push(id);
-    });
-    // loop after last step
-    const last = scenario.steps[scenario.steps.length-1].t;
-    const loopId = setTimeout(()=>{
-      // Swap scenario
-      onScenarioChange?.((scenarioIdx+1) % _SCENARIOS.length);
-    }, last + 4000);
-    timersRef.current.push(loopId);
-
-    return ()=> timersRef.current.forEach(clearTimeout);
-  }, [scenarioIdx, plant?.id, mode]);
-
   if(!plant) return null;
-  const cur = scenario.steps[stepIdx];
   const totalDur = scenario.steps[scenario.steps.length-1].t + 1500;
   const progress = Math.min(100, (cur?.t || 0) / totalDur * 100);
 
@@ -124,9 +127,7 @@ function PlantDetail({plant, onClose, scenarioIdx, mode, onModeChange, onScenari
         <SceneStage plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur} mode={mode}/>
 
         <div className="scenario-timeline">
-          <div className="lbl">
-            {scenario.title}
-          </div>
+          <div className="lbl">{scenario.title}</div>
           <div className="track"><i style={{width: progress+'%'}}/></div>
           <div className="step-name">
             {cur && (<>
@@ -152,24 +153,20 @@ function PlantDetail({plant, onClose, scenarioIdx, mode, onModeChange, onScenari
 function SceneStage({plant, scenario, stepIdx, cur, mode}){
   const visibleSteps = scenario.steps.slice(0, stepIdx+1);
   const activeAgentIds = useMemo(()=>{
-    // last few steps' active agents
     const set = new Set();
     visibleSteps.slice(-3).forEach(s=>{ set.add(s.from); set.add(s.to); });
     return set;
   },[stepIdx, scenario.id]);
 
-  // hot cells on the array grid (representing problem areas)
   const hotCells = useMemo(()=>{
-    return [16, 17, 28, 29, 64, 76, 88]; // arbitrary hot cells for scenario
+    return [16, 17, 28, 29, 64, 76, 88];
   },[plant.id]);
 
-  // animated edge: last step connection
   const fromPos = cur ? NODE_POS[cur.from] : null;
   const toPos = cur ? NODE_POS[cur.to] : null;
 
   return (
     <div className="scene-stage">
-      {/* central plant graphic (PV array) */}
       <div className="plant-graphic">
         <div className="array-grid">
           {Array.from({length:96}).map((_,i)=>{
@@ -189,7 +186,6 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
         </div>
       </div>
 
-      {/* edge lines between agents */}
       <svg style={{position:'absolute',inset:0,pointerEvents:'none',width:'100%',height:'100%'}}
            viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs>
@@ -202,20 +198,17 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
             <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
           </marker>
         </defs>
-        {/* faded backbone lines */}
         {Object.keys(NODE_POS).filter(k=>k!=='plant').map(k=>{
           const p = NODE_POS[k];
           return <line key={'bb-'+k} x1={p.x} y1={p.y} x2={50} y2={50}
                        stroke="rgba(120,160,220,0.06)" strokeWidth="0.15" strokeDasharray="0.6 1" vectorEffect="non-scaling-stroke"/>;
         })}
-        {/* active step edge */}
         {fromPos && toPos && cur.from !== cur.to && (
           <g>
             <line x1={fromPos.x} y1={fromPos.y} x2={toPos.x} y2={toPos.y}
                   stroke="#22d3ee" strokeWidth="0.3" strokeDasharray="1.2 0.8" opacity="0.85" vectorEffect="non-scaling-stroke">
               <animate attributeName="stroke-dashoffset" from="0" to="-4" dur="0.6s" repeatCount="indefinite"/>
             </line>
-            {/* travelling pulse */}
             <circle r="0.7" fill="#22d3ee" filter="drop-shadow(0 0 6px #22d3ee)">
               <animateMotion dur="1.4s" repeatCount="indefinite"
                 path={`M ${fromPos.x} ${fromPos.y} L ${toPos.x} ${toPos.y}`}/>
@@ -224,7 +217,6 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
         )}
       </svg>
 
-      {/* agent nodes around the perimeter */}
       {Object.entries(NODE_POS).filter(([id])=>id!=='plant').map(([id,pos])=>{
         const cat = getCat(id);
         const isActive = activeAgentIds.has(id);
@@ -243,7 +235,6 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
         );
       })}
 
-      {/* current step bubble */}
       {cur && toPos && (
         <div className="scene-bubble" key={stepIdx}
              style={{left: toPos.x+'%', top: (toPos.y - 5)+'%'}}>
@@ -252,16 +243,10 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
         </div>
       )}
 
-      {/* digital team roster */}
       <DigitalTeam plant={plant} activeAgentIds={activeAgentIds}/>
-
-      {/* scenario log — positioned below team panel dynamically */}
       <SceneLog scenario={scenario} steps={visibleSteps} plant={plant}/>
-
-      {/* token strip */}
       <TokenStrip plant={plant} stepIdx={stepIdx}/>
 
-      {/* legend */}
       <div className="legend">
         <span><i style={{background:'#34d399'}}/>正常</span>
         <span><i style={{background:'#fbbf24'}}/>预警</span>
@@ -272,7 +257,6 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
   );
 }
 
-// ── Digital Team roster panel (left, top)
 function DigitalTeam({plant, activeAgentIds}){
   const ALL_IDS = ['ops','warn','alert','diag','safe','order','sched','pv','insp','query'];
   return (
@@ -310,10 +294,10 @@ function DigitalTeam({plant, activeAgentIds}){
 
 function SceneLog({scenario, steps, plant}){
   const ref = useRef(null);
-  // team-panel height: header(38) + 10 rows*(10 agents, ~38px each) but capped
-  const teamRows = 10; // always render all 10 agent slots
-  const teamH = 38 + teamRows * 38; // ~418px
-  const topOffset = 14 + teamH + 10; // team top(14) + height + gap
+  // header(35) + 10 rows × 30px (more compact) = 335
+  const teamRows = 10;
+  const teamH = 35 + teamRows * 30;
+  const topOffset = 14 + teamH + 10;
   useEffect(()=>{
     if(ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   },[steps.length]);
@@ -348,7 +332,6 @@ function SceneLog({scenario, steps, plant}){
 }
 
 function TokenStrip({plant, stepIdx}){
-  // computed token totals & sparkline
   const base = 24800;
   const used = base + stepIdx * 1240 + Math.floor(Math.sin(stepIdx)*120);
   const spark = useMemo(()=>Array.from({length:32}).map((_,i)=>0.3+0.6*Math.abs(Math.sin(i*0.6+plant.id.length))*(0.6+0.4*Math.random())),[plant.id]);
@@ -369,4 +352,295 @@ function TokenStrip({plant, stepIdx}){
   );
 }
 
-window.IRUN_DETAIL = { PlantDetail };
+// ─────────────────────────────────────────────────────────────────────
+// PlantInlineDock — inline 6-card dashboard for img2 mode (replaces popup)
+function PlantInlineDock({plant, scenario, stepIdx, cur, mode, scenarioIdx, onModeChange, onScenarioChange, onOpenModal}){
+  const totalDur = scenario.steps[scenario.steps.length-1].t + 1500;
+  const progress = Math.min(100, (cur?.t || 0) / totalDur * 100);
+  const visibleSteps = scenario.steps.slice(0, stepIdx+1);
+  const activeAgentIds = useMemo(()=>{
+    const set = new Set();
+    visibleSteps.slice(-3).forEach(s=>{ set.add(s.from); set.add(s.to); });
+    return set;
+  },[stepIdx, scenario.id]);
+
+  const stopProp = e => e.stopPropagation();
+  const open = (sec) => () => onOpenModal?.(sec);
+
+  return (
+    <div className="plant-inline-dock">
+      <PIDCardKpi
+        plant={plant} mode={mode} scenarioIdx={scenarioIdx} scenario={scenario}
+        cur={cur} stepIdx={stepIdx} progress={progress}
+        onModeChange={onModeChange} onScenarioChange={onScenarioChange}
+        onOpen={open('kpi')}/>
+
+      <PIDCardTeam
+        plant={plant} activeAgentIds={activeAgentIds}
+        onOpen={open('team')}/>
+
+      <PIDCardLog
+        scenario={scenario} steps={visibleSteps}
+        onOpen={open('log')}/>
+
+      <PIDCardPv
+        plant={plant} scenario={scenario} stepIdx={stepIdx}
+        onOpen={open('pv')}/>
+
+      <PIDCardScene
+        plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur}
+        activeAgentIds={activeAgentIds}
+        onOpen={open('scene')}/>
+
+      <PIDCardToken
+        plant={plant} stepIdx={stepIdx}
+        onOpen={open('token')}/>
+    </div>
+  );
+}
+
+// ── Card 1: Plant KPI summary + mode tabs + scenario timeline
+function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress, onModeChange, onScenarioChange, onOpen}){
+  const stopProp = e => e.stopPropagation();
+  return (
+    <div className="pid-card pid-c-kpi" onClick={onOpen}>
+      <div className="pid-k-top">
+        <b className="pid-k-name">{plant.name}</b>
+        <button className="pid-k-btn">▶ 播放</button>
+        <button className="pid-k-btn">⛶ 全屏</button>
+      </div>
+      <div className="pid-k-sub">{plant.region} · {plant.capacity} MW · 实时功率 {plant.power} MW</div>
+      <div className="pid-k-stats">
+        <div className="s"><span className="l">日发电</span><span className="v">{plant.gen}<small>MWh</small></span></div>
+        <div className="s"><span className="l">告警</span><span className="v" style={{color: plant.alerts>4?'var(--rose)':'#fff'}}>{plant.alerts}</span></div>
+        <div className="s"><span className="l">PR</span><span className="v">{(82+plant.id.charCodeAt(1)%7).toFixed(1)}%</span></div>
+      </div>
+      <div className="pid-k-mode">
+        <button className={mode==='auto'?'on':''} onClick={(e)=>{stopProp(e); onModeChange('auto');}}>托管模式</button>
+        <button className={mode==='command'?'on':''} onClick={(e)=>{stopProp(e); onModeChange('command');}}>指挥模式</button>
+      </div>
+      <div className="pid-k-tl">
+        <div className="pid-tl-chips">
+          {_SCENARIOS.map((s,i)=>(
+            <button key={s.id}
+              className={`pid-q-chip${i===scenarioIdx?' on':''}`}
+              onClick={(e)=>{stopProp(e); onScenarioChange(i);}}>{s.id}</button>
+          ))}
+          <span className="pid-tl-lbl">场景 {scenario.id} · {scenario.title}</span>
+        </div>
+        <div className="pid-tl-track"><i style={{width: progress+'%'}}/></div>
+        <div className="pid-tl-step">step {stepIdx+1}/{scenario.steps.length} · {cur?.tag||''}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Card 2: Digital Team (auto-scrolling list)
+function PIDCardTeam({plant, activeAgentIds, onOpen}){
+  const ALL_IDS = ['ops','warn','alert','diag','safe','order','sched','pv','insp','query'];
+  const listRef = useRef(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  useEffect(()=>{
+    const id = setInterval(()=>{
+      setScrollOffset(o => {
+        const el = listRef.current;
+        if(!el) return 0;
+        const max = el.scrollHeight - el.clientHeight;
+        if(max <= 0) return 0;
+        const next = o + 1;
+        return next > max + 30 ? 0 : next;
+      });
+    }, 60);
+    return ()=> clearInterval(id);
+  },[]);
+  useEffect(()=>{ if(listRef.current) listRef.current.scrollTop = scrollOffset; },[scrollOffset]);
+
+  return (
+    <div className="pid-card pid-c-team" onClick={onOpen}>
+      <div className="pid-h">
+        <span>数字团队</span>
+        <span className="pid-h-cnt">{plant.agents.length} / {ALL_IDS.length} 配备</span>
+      </div>
+      <div className="pid-team-list" ref={listRef}>
+        {ALL_IDS.map(id=>{
+          const ag = _D_ABI[id];
+          if(!ag) return null;
+          const cat = _D_CAT[ag.cat];
+          const assigned = plant.agents.includes(id);
+          const isActive = activeAgentIds.has(id);
+          const hasAlert = ag.notif > 0;
+          const statusLabel = !assigned ? '未配备' : isActive ? '工作中' : hasAlert ? '待处理' : '就绪';
+          const statusCls = !assigned ? '' : isActive ? 'work' : hasAlert ? 'alert' : '';
+          return (
+            <div key={id} className={`pid-team-row${assigned?'':' absent'}`} style={{'--cat-c':cat.color}}>
+              <div className="pid-tc">{ag.code}</div>
+              <div className="pid-ti">
+                <div className="pid-tn">{ag.name}</div>
+              </div>
+              <div className={`pid-ts ${statusCls}`}>{statusLabel}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Card 3: Multi-agent collaboration log (auto-scroll)
+function PIDCardLog({scenario, steps, onOpen}){
+  const ref = useRef(null);
+  useEffect(()=>{
+    if(ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+  },[steps.length]);
+  return (
+    <div className="pid-card pid-c-log" onClick={onOpen}>
+      <div className="pid-h">
+        <span>多 Agent 协同日志</span>
+        <span className="pid-h-badge">{scenario.id} · {steps.length}/{scenario.steps.length}</span>
+      </div>
+      <div className="pid-log-body" ref={ref}>
+        {steps.map((s,i)=>{
+          const from = _D_ABI[s.from];
+          const to = _D_ABI[s.to];
+          const fromName = from?.short || ({plant:'电站',field:'现场',drone:'无人机'}[s.from] || s.from);
+          const toName = to?.short || ({plant:'电站',field:'现场',drone:'无人机'}[s.to] || s.to);
+          return (
+            <div key={i} className="pid-log-ln">
+              <div className="pid-log-hd">
+                <span>T+{(s.t/1000).toFixed(1)}s</span>
+                <b>{fromName}</b>
+                <span>→</span>
+                <b style={{color: s.type==='handoff'?'#a78bfa':'var(--cyan)'}}>{toName}</b>
+                <span className="tg">[{s.tag}]</span>
+              </div>
+              <div className="pid-log-tx">{s.text}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Card 4: PV array preview (12x8 with hot cells)
+function PIDCardPv({plant, scenario, stepIdx, onOpen}){
+  const hotCells = useMemo(()=>[16, 17, 28, 29, 64, 76, 88], [plant.id]);
+  return (
+    <div className="pid-card pid-c-pv" onClick={onOpen}>
+      <div className="pid-h">
+        <span>PV-Array · 12×8</span>
+        <span className="pid-h-meta">{plant.short}</span>
+      </div>
+      <div className="pid-pv-wrap">
+        <div className="pid-pv-grid">
+          {Array.from({length:96}).map((_,i)=>{
+            const isHot = scenario.id==='A' && hotCells.includes(i) && stepIdx >= 1 && stepIdx < 16;
+            const isFixed = scenario.id==='A' && hotCells.includes(i) && stepIdx >= 16;
+            const isInsp = scenario.id==='B' && [22,23,40,55,70,84].includes(i) && stepIdx >= 3;
+            return <div key={i}
+              className={`pid-pv-cell ${isHot?'hot':''} ${isFixed?'work':''} ${isInsp?'hot':''}`}/>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Card 5: Full scene (PV grid + agent ring + connections + bubble)
+function PIDCardScene({plant, scenario, stepIdx, cur, activeAgentIds, onOpen}){
+  const hotCells = useMemo(()=>[16, 17, 28, 29, 64, 76, 88], [plant.id]);
+  const fromPos = cur ? NODE_POS[cur.from] : null;
+  const toPos = cur ? NODE_POS[cur.to] : null;
+
+  return (
+    <div className="pid-card pid-c-scene" onClick={onOpen}>
+      <div className="pid-h">
+        <span>协同图谱</span>
+        <span className="pid-h-meta">{Object.keys(NODE_POS).length-1} nodes</span>
+      </div>
+      <div className="pid-scene-wrap">
+        {/* mini PV grid in center */}
+        <div className="pid-scene-pv">
+          {Array.from({length:96}).map((_,i)=>{
+            const isHot = scenario.id==='A' && hotCells.includes(i) && stepIdx >= 1 && stepIdx < 16;
+            const isFixed = scenario.id==='A' && hotCells.includes(i) && stepIdx >= 16;
+            const isInsp = scenario.id==='B' && [22,23,40,55,70,84].includes(i) && stepIdx >= 3;
+            return <div key={i} className={`pid-scene-cell ${isHot?'hot':''} ${isFixed?'work':''} ${isInsp?'hot':''}`}/>;
+          })}
+        </div>
+        {/* connection lines */}
+        <svg className="pid-scene-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {Object.keys(NODE_POS).filter(k=>k!=='plant').map(k=>{
+            const p = NODE_POS[k];
+            return <line key={'bb-'+k} x1={p.x} y1={p.y} x2={50} y2={50}
+                         stroke="rgba(120,160,220,0.08)" strokeWidth="0.2" strokeDasharray="0.6 1" vectorEffect="non-scaling-stroke"/>;
+          })}
+          {fromPos && toPos && cur.from !== cur.to && (
+            <g>
+              <line x1={fromPos.x} y1={fromPos.y} x2={toPos.x} y2={toPos.y}
+                    stroke="#22d3ee" strokeWidth="0.4" strokeDasharray="1.2 0.8" opacity="0.85" vectorEffect="non-scaling-stroke">
+                <animate attributeName="stroke-dashoffset" from="0" to="-4" dur="0.6s" repeatCount="indefinite"/>
+              </line>
+              <circle r="1" fill="#22d3ee" filter="drop-shadow(0 0 4px #22d3ee)">
+                <animateMotion dur="1.4s" repeatCount="indefinite"
+                  path={`M ${fromPos.x} ${fromPos.y} L ${toPos.x} ${toPos.y}`}/>
+              </circle>
+            </g>
+          )}
+        </svg>
+        {/* agent dots around perimeter */}
+        {Object.entries(NODE_POS).filter(([id])=>id!=='plant').map(([id,pos])=>{
+          const cat = getCat(id);
+          const isActive = activeAgentIds.has(id);
+          const ag = _D_ABI[id];
+          const code = ag?.code || (id==='field' ? 'FLD' : id==='drone' ? 'UAV' : 'XX');
+          const present = !ag || plant.agents.includes(id) || id==='field' || id==='drone';
+          return (
+            <div key={id}
+                 className={`pid-scene-node ${isActive?'active':''}`}
+                 style={{left:pos.x+'%', top:pos.y+'%', '--cat-color':cat.color, opacity: present?1:0.35}}>
+              <div className="pid-sn-circle" style={{color:cat.color, background: isActive?'rgba(34,211,238,0.16)':'rgba(6,10,22,0.85)'}}>
+                {code}
+              </div>
+            </div>
+          );
+        })}
+        {/* current step mini bubble */}
+        {cur && toPos && (
+          <div className="pid-scene-bubble"
+               style={{left: toPos.x+'%', top: (toPos.y - 6)+'%'}}>
+            {cur.tag}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Card 6: TOKEN consumption
+function PIDCardToken({plant, stepIdx, onOpen}){
+  const base = 24800;
+  const used = base + stepIdx * 1240 + Math.floor(Math.sin(stepIdx)*120);
+  const spark = useMemo(()=>Array.from({length:32}).map((_,i)=>0.3+0.6*Math.abs(Math.sin(i*0.6+plant.id.length))*(0.6+0.4*Math.random())),[plant.id]);
+  return (
+    <div className="pid-card pid-c-token" onClick={onOpen}>
+      <div className="pid-h">
+        <span>TOKEN · 实时消耗</span>
+      </div>
+      <div className="pid-tok-big">{(used/1000).toFixed(2)}<small>K · 今日</small></div>
+      <div className="pid-tok-rows">
+        <div className="r"><span>强度 / MW</span><span>{(used/plant.capacity).toFixed(0)}</span></div>
+        <div className="r"><span>调用 / min</span><span>{(8 + stepIdx*0.6).toFixed(1)}</span></div>
+        <div className="r"><span>成功率</span><span style={{color:'var(--emerald)'}}>98.6%</span></div>
+      </div>
+      <svg viewBox="0 0 220 30" className="pid-tok-spark" preserveAspectRatio="none">
+        <polyline fill="none" stroke="#22d3ee" strokeWidth="1.2"
+          points={spark.map((v,i)=>`${i*(220/(spark.length-1))},${30-v*22}`).join(' ')}/>
+        <polyline fill="rgba(34,211,238,0.12)" stroke="none"
+          points={`0,30 ${spark.map((v,i)=>`${i*(220/(spark.length-1))},${30-v*22}`).join(' ')} 220,30`}/>
+      </svg>
+    </div>
+  );
+}
+
+window.IRUN_DETAIL = { PlantDetail, PlantInlineDock, useScenarioStepping };

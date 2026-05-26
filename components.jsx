@@ -35,9 +35,10 @@ function fmtDate(d){
 
 // ──────────────────────────────────────────────────────────────────────
 // Top bar
-function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack, lang, onLang}){
+function TopBar({focusPlant, plants, onPlantChange, tenant, tenantIdx, onTenant, onBack, lang, onLang}){
   const clock = useClock();
   const zh = lang !== 'en';
+  const [plantPickerOpen, setPlantPickerOpen] = useState(false);
   const k = focusPlant ? {
     cap: focusPlant.capacity, pwr: focusPlant.power, gen: focusPlant.gen, al: focusPlant.alerts,
     plants: 1, risk: focusPlant.risk === 'high' ? 1 : 0,
@@ -68,7 +69,26 @@ function TopBar({focusPlant, tenant, tenantIdx, onTenant, onBack, lang, onLang})
         <span className={`crumb ${!focusPlant?'active':''}`} onClick={onBack} style={{cursor:focusPlant?'pointer':'default'}}>{zh?'总览':'Overview'}</span>
         {focusPlant && <>
           <span className="crumb-sep">/</span>
-          <span className="crumb active">{focusPlant.name}</span>
+          <div className="crumb-picker" onMouseLeave={()=>setPlantPickerOpen(false)}>
+            <span className="crumb active picker-btn" onClick={()=>setPlantPickerOpen(o=>!o)}>
+              {focusPlant.name}
+              <span className={`picker-caret${plantPickerOpen?' open':''}`}>▼</span>
+            </span>
+            {plantPickerOpen && (
+              <div className="crumb-picker-menu">
+                <div className="cpm-h">{zh?'切换电站':'Switch Plant'}</div>
+                {(plants||[]).map(p=>(
+                  <div key={p.id}
+                       className={`cpm-item${p.id===focusPlant.id?' active':''}`}
+                       onClick={()=>{ onPlantChange?.(p.id); setPlantPickerOpen(false); }}>
+                    <span className={`cpm-dot cpm-dot-${p.risk||'low'}`}/>
+                    <span className="cpm-name">{p.name}</span>
+                    <span className="cpm-meta">{p.capacity.toFixed(1)} MW</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </>}
       </div>
 
@@ -1012,7 +1032,43 @@ function SkillModal({ onClose }){
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, useClock, fmtTime, fmtDate, LangCtx };
+// ──────────────────────────────────────────────────────────────────────
+// Plant title selector — centered banner shown in img2 mode
+function PlantTitle({plant, plants, onChange}){
+  const l = useLang(); const zh = l !== 'en';
+  const [open, setOpen] = useState(false);
+  if (!plant) return null;
+  return (
+    <div className="plant-title" onMouseLeave={()=>setOpen(false)}>
+      <div className="pt-corner pt-corner-tl"/>
+      <div className="pt-corner pt-corner-tr"/>
+      <div className="pt-corner pt-corner-bl"/>
+      <div className="pt-corner pt-corner-br"/>
+      <button className="pt-main" onClick={()=>setOpen(o=>!o)}>
+        <span className="pt-dot"/>
+        <span className="pt-name">{plant.name}</span>
+        <span className="pt-region">{plant.region}</span>
+        <span className={`pt-caret${open?' open':''}`}>▾</span>
+      </button>
+      {open && (
+        <div className="pt-menu">
+          <div className="pt-menu-h">{zh?'切换电站':'Switch Plant'}</div>
+          {plants.map(p => (
+            <div key={p.id}
+                 className={`pt-item${p.id===plant.id?' active':''}`}
+                 onClick={()=>{ onChange(p.id); setOpen(false); }}>
+              <span className={`pt-i-dot pt-i-dot-${p.risk||'low'}`}/>
+              <span className="pt-i-name">{p.name}</span>
+              <span className="pt-i-meta">{p.capacity.toFixed(1)} MW</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, useClock, fmtTime, fmtDate, LangCtx };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left

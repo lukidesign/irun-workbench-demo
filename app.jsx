@@ -1,9 +1,9 @@
 // iRun Workbench — App root
 const { useState: _aUseState, useEffect: _aUseEffect, useCallback: _aUseCallback } = React;
 const useState = _aUseState, useEffect = _aUseEffect, useCallback = _aUseCallback;
-const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal, LangCtx } = window.IRUN_UI;
+const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal, PlantTitle, LangCtx } = window.IRUN_UI;
 const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
-const { PlantDetail } = window.IRUN_DETAIL;
+const { PlantDetail, PlantInlineDock, useScenarioStepping } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
 const { PLANTS: APP_PLANTS, TENANTS: APP_TENANTS, AGENTS: APP_AGENTS, AGENT_BY_ID: APP_ABI } = window.IRUN;
 
@@ -47,6 +47,7 @@ function App(){
   const [mode, setMode] = useState('auto');
   const [busyMap, setBusyMap] = useState({});
   const [scenarioEvents, setScenarioEvents] = useState([]);
+  const [showPlantModal, setShowPlantModal] = useState(false);
 
   // Fit-to-viewport scaling
   useEffect(()=>{
@@ -96,20 +97,31 @@ function App(){
       setBusyMap({});
       setMode('auto');
       setScenarioIdx(0);
+      setShowPlantModal(false);
     }
   }, [focusPlant?.id]);
+
+  // Centralised scenario stepping — drives both PlantInlineDock and PlantDetail popup
+  const { stepIdx, cur, scenario } = useScenarioStepping({
+    scenarioIdx,
+    plantId: focusPlant?.id,
+    mode,
+    onStep,
+    onScenarioChange: setScenarioIdx,
+  });
 
   // ESC to close
   useEffect(()=>{
     const onKey = e => {
       if(e.key==='Escape'){
         if(openAgent) setOpenAgent(null);
+        else if(showPlantModal) setShowPlantModal(false);
         else if(focusId) setFocusId(null);
       }
     };
     window.addEventListener('keydown', onKey);
     return ()=>window.removeEventListener('keydown', onKey);
-  },[openAgent, focusId]);
+  },[openAgent, focusId, showPlantModal]);
 
   const totalTokens = APP_AGENTS.reduce((s,a)=>s + parseFloat(a.metrics.tokens)*1000, 0);
   const busyCount = Object.values(busyMap).filter(Boolean).length || 3;
@@ -153,7 +165,7 @@ function App(){
       <ModeStrip mode={viewMode} onChange={setViewMode}/>
 
       {/* top KPIs */}
-      <TopBar focusPlant={focusPlant} tenant={tenant} tenantIdx={tenantIdx} onTenant={setTenantIdx} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang}/>
+      <TopBar focusPlant={focusPlant} plants={APP_PLANTS} onPlantChange={setFocusId} tenant={tenant} tenantIdx={tenantIdx} onTenant={setTenantIdx} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang}/>
 
       {/* left + right rails over map */}
       <div className="stage">
@@ -183,21 +195,37 @@ function App(){
         tooltipEnabled={dispatchCollapsed}/>
 
 
-      {/* dock */}
+      {/* dock — img2+focusPlant shows inline plant dashboard, else agent token panel */}
       <div className="dock">
-        <AgentTokenPanel busyMap={busyMap} onOpen={setOpenAgent}/>
+        {(viewMode === 'img2' && focusPlant)
+          ? <PlantInlineDock
+              plant={focusPlant}
+              scenario={scenario}
+              stepIdx={stepIdx}
+              cur={cur}
+              mode={mode}
+              scenarioIdx={scenarioIdx}
+              onModeChange={setMode}
+              onScenarioChange={setScenarioIdx}
+              onOpenModal={()=>setShowPlantModal(true)}/>
+          : <AgentTokenPanel busyMap={busyMap} onOpen={setOpenAgent}/>}
       </div>
 
-      {/* plant detail overlay (auto-cycle scenarios) */}
-      {focusPlant && (
+      {/* plant detail overlay — popup mode (click any inline card) or auto-open in non-img2 modes */}
+      {focusPlant && (viewMode !== 'img2' || showPlantModal) && (
         <PlantDetail
           plant={focusPlant}
-          scenarioIdx={scenarioIdx}
+          scenario={scenario}
+          stepIdx={stepIdx}
+          cur={cur}
           mode={mode}
+          scenarioIdx={scenarioIdx}
           onModeChange={setMode}
           onScenarioChange={setScenarioIdx}
-          onStep={onStep}
-          onClose={()=>setFocusId(null)}/>
+          onClose={()=>{
+            if(viewMode === 'img2') setShowPlantModal(false);
+            else setFocusId(null);
+          }}/>
       )}
 
       {/* agent modal */}
