@@ -93,23 +93,12 @@ function PlantsMap({focusId, onFocus}){
 const MAP2_PINS = [
   { id: 'p7', x: '12%',  y: '40%' },   // left solar field
   { id: 'p3', x: '27%',  y: '55%' },   // center-left lower
-  { id: 'p1', x: '37%',  y: '55%' },   // center lower
+  { id: 'p1', x: '41%',  y: '68%' },   // 东源 #01 — small panel below
   { id: 'p5', x: '42%',  y: '37%' },   // center-upper building
-  { id: 'p2', x: '58%',  y: '42%' },   // center-right upper
+  { id: 'p2', x: '62%',  y: '55%' },   // Banten-A — building cluster lower
   { id: 'p6', x: '75%',  y: '53%' },   // right lower
-  { id: 'p4', x: '85%',  y: '40%' },   // far right
+  { id: 'p4', x: '82%',  y: '52%' },   // Cebu-N — building lower-left of original
 ];
-
-// Per-plant pin color (so each station has its own visual identity on the map)
-const PIN_COLORS = {
-  p1: '#f87171', // 东源 #01 — red
-  p2: '#34d399', // Banten-A — emerald
-  p3: '#a78bfa', // 示范站 — violet
-  p4: '#22d3ee', // Cebu-N — cyan
-  p5: '#fbbf24', // 东源 #02 — amber
-  p6: '#fb923c', // Selangor — orange
-  p7: '#ec4899', // 横州渔光 — pink
-};
 
 function Map2Overlay({ focusId, onFocus }) {
   return (
@@ -117,7 +106,7 @@ function Map2Overlay({ focusId, onFocus }) {
       {MAP2_PINS.map((pos, i) => {
         const plant = _MAP_PLANTS.find(p => p.id === pos.id);
         if (!plant) return null;
-        const colour = PIN_COLORS[plant.id] || '#22d3ee';
+        const colour = plant.risk==='high' ? '#f87171' : plant.risk==='mid' ? '#fbbf24' : '#22d3ee';
         const statusLabel = plant.risk==='high' ? '⚠ 高风险' : plant.risk==='mid' ? '△ 关注' : '✓ 正常';
         return (
           <div
