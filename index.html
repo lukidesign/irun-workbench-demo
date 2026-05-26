@@ -762,20 +762,28 @@ body{
 .pid-tok-spark{flex:1;width:100%;min-height:18px;display:block;margin-top:auto}
 
 /* ------ TopBar crumb plant picker ------ */
-.crumb-picker{position:relative;display:inline-block}
+.crumb-picker{position:relative;display:inline-block;z-index:61}
 .picker-btn{
-  cursor:pointer;display:inline-flex;align-items:center;gap:6px;
-  padding:4px 10px;border:1px solid transparent;
+  cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+  padding:7px 14px;
+  border:1px solid rgba(34,211,238,0.25);
+  background:rgba(34,211,238,0.04);
+  color:var(--text);
+  font-size:11.5px;letter-spacing:0.18em;text-transform:uppercase;
+  font-family:inherit;
   transition:all .15s ease;
   user-select:none;
+  position:relative;
+  outline:none;
 }
-.picker-btn:hover{color:var(--cyan);border-color:rgba(34,211,238,0.3);background:rgba(34,211,238,0.06)}
+.picker-btn:hover{color:var(--cyan);border-color:rgba(34,211,238,0.55);background:rgba(34,211,238,0.1)}
 .picker-btn.open{
   color:var(--cyan);border-color:var(--cyan);
-  background:rgba(34,211,238,0.1);
-  box-shadow:0 0 10px rgba(34,211,238,0.18);
+  background:rgba(34,211,238,0.14);
+  box-shadow:0 0 12px rgba(34,211,238,0.25);
 }
-.picker-caret{font-size:8px;color:var(--cyan);transition:transform .2s ease;display:inline-block;opacity:0.7}
+.picker-btn-name{display:inline-block}
+.picker-caret{font-size:9px;color:var(--cyan);transition:transform .2s ease;display:inline-block;opacity:0.85}
 .picker-btn:hover .picker-caret,.picker-btn.open .picker-caret{opacity:1}
 .picker-caret.open{transform:rotate(180deg)}
 .crumb-picker-menu{

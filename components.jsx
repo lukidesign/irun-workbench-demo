@@ -87,18 +87,28 @@ function TopBar({focusPlant, plants, onPlantChange, tenant, tenantIdx, onTenant,
         {focusPlant && <>
           <span className="crumb-sep">/</span>
           <div className="crumb-picker" ref={pickerRef}>
-            <span className={`crumb active picker-btn${plantPickerOpen?' open':''}`}
-                  onClick={()=>setPlantPickerOpen(o=>!o)}>
-              {focusPlant.name}
+            <button type="button"
+                    className={`crumb active picker-btn${plantPickerOpen?' open':''}`}
+                    onMouseDown={(e)=>{
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPlantPickerOpen(o=>!o);
+                    }}>
+              <span className="picker-btn-name">{focusPlant.name}</span>
               <span className={`picker-caret${plantPickerOpen?' open':''}`}>▼</span>
-            </span>
+            </button>
             {plantPickerOpen && (
-              <div className="crumb-picker-menu">
+              <div className="crumb-picker-menu" onMouseDown={e=>e.stopPropagation()}>
                 <div className="cpm-h">{zh?'切换电站':'Switch Plant'}</div>
                 {(plants||[]).map(p=>(
                   <div key={p.id}
                        className={`cpm-item${p.id===focusPlant.id?' active':''}`}
-                       onClick={()=>{ onPlantChange?.(p.id); setPlantPickerOpen(false); }}>
+                       onMouseDown={(e)=>{
+                         e.preventDefault();
+                         e.stopPropagation();
+                         onPlantChange?.(p.id);
+                         setPlantPickerOpen(false);
+                       }}>
                     <span className={`cpm-dot cpm-dot-${p.risk||'low'}`}/>
                     <span className="cpm-name">{p.name}</span>
                     <span className="cpm-meta">{p.capacity.toFixed(1)} MW</span>
