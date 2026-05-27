@@ -33,9 +33,50 @@ function fmtDate(d){
   return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())}`;
 }
 
+// ── Weather mock (deterministic by seed; Seniverse-style icons) ──────
+const WX_TABLE = [
+  { key:'sunny',    cn:'晴',     en:'Sunny',    icon:'sun' },
+  { key:'cloudy',   cn:'多云',   en:'Cloudy',   icon:'cloud-sun' },
+  { key:'overcast', cn:'阴',     en:'Overcast', icon:'cloud' },
+  { key:'rain',     cn:'小雨',   en:'Rain',     icon:'rain' },
+  { key:'thunder',  cn:'雷阵雨', en:'Thunder',  icon:'thunder' },
+];
+function pickWx(seed){
+  const s = String(seed || 'demo');
+  const h = s.split('').reduce((a,c)=>a+c.charCodeAt(0), 0);
+  return { ...WX_TABLE[h % WX_TABLE.length], temp: 18 + (h % 18) };
+}
+function WxIcon({type}){
+  const props = { width:14, height:14, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:1.5, strokeLinecap:'round', strokeLinejoin:'round' };
+  switch(type){
+    case 'sun': return (
+      <svg {...props}><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="6.9" y2="6.9"/><line x1="17.1" y1="17.1" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.9" y2="17.1"/><line x1="17.1" y1="6.9" x2="19.1" y2="4.9"/></svg>
+    );
+    case 'cloud-sun': return (
+      <svg {...props}><circle cx="7" cy="8" r="2.5"/><line x1="7" y1="3" x2="7" y2="4.5"/><line x1="2.5" y1="8" x2="4" y2="8"/><line x1="3.8" y1="4.8" x2="4.8" y2="5.8"/><path d="M9 17h8a3 3 0 0 0 0-6 5 5 0 0 0-9.7-1"/></svg>
+    );
+    case 'cloud': return (
+      <svg {...props}><path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5-1A4 4 0 0 0 7 18z"/></svg>
+    );
+    case 'rain': return (
+      <svg {...props}><path d="M7 14h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5-1A4 4 0 0 0 7 14z"/><line x1="8" y1="17" x2="8" y2="20"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="16" y1="17" x2="16" y2="20"/></svg>
+    );
+    case 'thunder': return (
+      <svg {...props}><path d="M7 14h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5-1A4 4 0 0 0 7 14z"/><polyline points="11,17 9,21 13,21 11,23"/></svg>
+    );
+    default: return null;
+  }
+}
+function ThemeIcon({mode}){
+  const props = { width:14, height:14, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:1.5, strokeLinecap:'round', strokeLinejoin:'round' };
+  return mode === 'light'
+    ? (<svg {...props}><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="6.9" y2="6.9"/><line x1="17.1" y1="17.1" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.9" y2="17.1"/><line x1="17.1" y1="6.9" x2="19.1" y2="4.9"/></svg>)
+    : (<svg {...props}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>);
+}
+
 // ──────────────────────────────────────────────────────────────────────
 // Top bar
-function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTenant, onBack, lang, onLang}){
+function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTenant, onBack, lang, onLang, theme, onTheme}){
   const clock = useClock();
   const zh = lang !== 'en';
   const [plantPickerOpen, setPlantPickerOpen] = useState(false);
@@ -154,17 +195,36 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
       </div>
 
       <div className="right">
-        <div className="live-wrap">
-          <div className="live-time">
-            <span className="dt">{fmtDate(clock)}</span>
-            <span className="tm">{fmtTime(clock)}</span>
+        <div className="r-row r-row-top">
+          <div className="live-wrap">
+            <div className="live-time">
+              <span className="dt">{fmtDate(clock)}</span>
+              <span className="tm">{fmtTime(clock)}</span>
+            </div>
           </div>
+          <button className="lang-toggle" onClick={onLang} title={zh?'Switch to English':'切换中文'}>
+            <span className={zh?'lt-active':''}> 中 </span>
+            <span className="lt-sep">/</span>
+            <span className={!zh?'lt-active':''}>EN</span>
+          </button>
         </div>
-        <button className="lang-toggle" onClick={onLang} title={zh?'Switch to English':'切换中文'}>
-          <span className={zh?'lt-active':''}> 中 </span>
-          <span className="lt-sep">/</span>
-          <span className={!zh?'lt-active':''}>EN</span>
-        </button>
+        <div className="r-row r-row-bot">
+          {(() => {
+            const w = pickWx(focusPlant?.id || tenant?.id);
+            return (
+              <div className="weather-pill" title={`${zh?w.cn:w.en} · ${w.temp}°C`}>
+                <WxIcon type={w.icon}/>
+                <span className="wx-name">{zh?w.cn:w.en}</span>
+                <span className="wx-sep">·</span>
+                <span className="wx-t">{w.temp}°C</span>
+              </div>
+            );
+          })()}
+          <button className="theme-toggle" onClick={onTheme}
+                  title={theme==='light' ? (zh?'切换到暗色':'Switch to Dark') : (zh?'切换到亮色':'Switch to Light')}>
+            <ThemeIcon mode={theme}/>
+          </button>
+        </div>
       </div>
     </div>
   );

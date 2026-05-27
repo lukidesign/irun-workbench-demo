@@ -44,6 +44,9 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 
+/* ── Light theme — visually identical to dark for now.
+   Toggle + state still active; styling to be designed later. */
+
 /* fixed 1920×1080 design scaled to viewport */
 .workbench{
   position:fixed;
@@ -274,7 +277,7 @@ body{
   border-right:1px solid var(--line);position:relative;
 }
 .kpi:last-child{border-right:0}
-.kpi .l{font-size:10.5px;color:var(--text-mute);letter-spacing:0.22em;text-transform:uppercase}
+.kpi .l{font-size:10.5px;color:#fff;letter-spacing:0.22em;text-transform:uppercase}
 .kpi .v{font-family:var(--font-display);font-weight:600;font-size:22px;color:#fff;display:flex;align-items:baseline;gap:6px}
 .kpi .v small{font-size:11px;color:var(--text-dim);font-weight:400;letter-spacing:0.08em}
 .kpi .delta{font-size:10.5px;color:var(--emerald);font-family:var(--font-mono);letter-spacing:0.04em}
@@ -284,8 +287,33 @@ body{
 .kpi-bar i{display:block;height:1px;background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
 
 .topbar .right{
-  display:flex;align-items:center;gap:14px;padding:0 18px;border-left:1px solid var(--line);
+  display:flex;flex-direction:column;justify-content:center;gap:6px;
+  padding:0 18px;border-left:1px solid var(--line);
 }
+.topbar .right .r-row{
+  display:flex;align-items:center;gap:10px;justify-content:flex-end;
+}
+.topbar .right .r-row-bot{ min-height:24px; }
+/* weather pill (bottom-left of right cluster) */
+.weather-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 8px;border-radius:4px;
+  background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.22);
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.06em;
+  color:rgba(200,225,255,0.85);max-width:150px;overflow:hidden;white-space:nowrap;
+}
+.weather-pill svg{flex-shrink:0;color:var(--cyan);opacity:0.95}
+.weather-pill .wx-name{overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1}
+.weather-pill .wx-sep{opacity:0.4;flex-shrink:0}
+.weather-pill .wx-t{font-weight:600;color:#fff;flex-shrink:0}
+/* theme toggle (bottom-right, matches lang-toggle vibe) */
+.theme-toggle{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:24px;border-radius:5px;cursor:pointer;flex-shrink:0;
+  background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.25);
+  color:rgba(180,220,255,0.7);transition:border-color .2s,background .2s,color .2s;
+}
+.theme-toggle:hover{background:rgba(34,211,238,0.12);border-color:rgba(34,211,238,0.55);color:var(--cyan);}
 .tenant-pill{
   display:flex;align-items:center;gap:8px;padding:4px 10px 4px 12px;border:1px solid var(--line);
   font-size:11px;color:var(--text-dim);letter-spacing:0.1em;cursor:pointer;position:relative;

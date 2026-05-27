@@ -34,7 +34,10 @@ function App(){
   const [tenantIdx, setTenantIdx] = useState(0);
   const tenant = APP_TENANTS[tenantIdx];
   const [viewMode, setViewMode] = useState('map2'); // map2 | img2
-  const [map2SubMode, setMap2SubMode] = useState('show'); // show | roam
+  // dark theme: show | roam      ·  light theme: pic1 | pic2
+  const [map2SubMode, setMap2SubMode] = useState(() => {
+    try { return (localStorage.getItem('irun:theme') || 'light') === 'light' ? 'pic1' : 'show'; } catch(e) { return 'pic1'; }
+  });
   // Switching tenant → drop focus & return to OVERVIEW
   const onTenantChange = useCallback((idx) => {
     setTenantIdx(idx);
@@ -45,6 +48,17 @@ function App(){
   const tenantPlants = APP_PLANTS.filter(p => p.tenant === tenant.id);
   const tenantAgg = APP_AGG_OF ? APP_AGG_OF(tenantPlants) : { plants: tenantPlants.length, capacity:0, power:0, gen:0, alerts:0, risk:0 };
   const [lang, setLang] = useState(()=>{ try{ return localStorage.getItem('irun:lang')||'zh'; }catch(e){ return 'zh'; } });
+  const [theme, setTheme] = useState(()=>{ try{ return localStorage.getItem('irun:theme')||'light'; }catch(e){ return 'light'; } });
+  const toggleTheme = () => setTheme(t => {
+    const n = t==='light' ? 'dark' : 'light';
+    try{ localStorage.setItem('irun:theme', n); }catch(e){}
+    // sync map2 subMode to the valid set for the new theme
+    setMap2SubMode(prev => {
+      if (n === 'light') return (prev === 'pic1' || prev === 'pic2') ? prev : 'pic1';
+      return (prev === 'show' || prev === 'roam') ? prev : 'show';
+    });
+    return n;
+  });
   const toggleLang = () => setLang(l => {
     const n = l==='zh'?'en':'zh';
     try{ localStorage.setItem('irun:lang', n); }catch(e){}
@@ -139,7 +153,7 @@ function App(){
 
   return (
     <LangCtx.Provider value={lang}>
-    <div className={`workbench${(viewMode==='img2' && focusPlant) ? ' img2-focused' : ''}`}>
+    <div className={`workbench theme-${theme}${(viewMode==='img2' && focusPlant) ? ' img2-focused' : ''}`}>
       {/* background scene */}
       <div className="scene">
         <div className="grid-bg"/>
@@ -150,8 +164,9 @@ function App(){
       {/* full-bleed image background (image modes + map2 展示) */}
       {(viewMode === 'img2') && (() => {
         const idx = focusPlant ? APP_PLANTS.findIndex(p=>p.id===focusPlant.id) : -1;
+        const suffix = theme === 'light' ? 'qian' : '';
         const bg = idx >= 0
-          ? `plant${String(idx+1).padStart(3,'0')}.png`
+          ? `plant${String(idx+1).padStart(3,'0')}${suffix}.png`
           : 'img2.jpg';
         return <div className="scene-img-bg" style={{backgroundImage:`url('${bg}')`}}/>;
       })()}
@@ -179,21 +194,28 @@ function App(){
       {viewMode === 'map' && <PlantsMap focusId={focusId} onFocus={setFocusId}/>}
       {viewMode === 'map2' && <Map2Overlay focusId={focusId} onFocus={(id)=>{ setFocusId(id); setViewMode('img2'); }} subMode={map2SubMode} tenantId={tenant.id}/>}
 
-      {/* map2 展示/漫游 toggle */}
+      {/* map2 toggle — theme-aware:
+            light → 图1 / 图2 (qian backgrounds)
+            dark  → 展示 / 漫游 (rjgf001 + manyou001) */}
       {viewMode === 'map2' && (
         <div className="map2-toggle">
-          <button className={`map2-toggle-btn${map2SubMode==='pic1'?' active':''}`} onClick={()=>setMap2SubMode('pic1')}>{lang==='en'?'Img 1':'图1'}</button>
-          <button className={`map2-toggle-btn${map2SubMode==='pic2'?' active':''}`} onClick={()=>setMap2SubMode('pic2')}>{lang==='en'?'Img 2':'图2'}</button>
-          <button className={`map2-toggle-btn${map2SubMode==='pic3'?' active':''}`} onClick={()=>setMap2SubMode('pic3')}>{lang==='en'?'Img 3':'图3'}</button>
-          <button className={`map2-toggle-btn${map2SubMode==='vid3'?' active':''}`} onClick={()=>setMap2SubMode('vid3')}>{lang==='en'?'Video 3':'视频3'}</button>
-          <button className={`map2-toggle-btn${map2SubMode==='show'?' active':''}`} onClick={()=>setMap2SubMode('show')}>{lang==='en'?'View':'展示'}</button>
-          <button className={`map2-toggle-btn${map2SubMode==='roam'?' active':''}`} onClick={()=>setMap2SubMode('roam')}>{lang==='en'?'Roam':'漫游'}</button>
+          {theme === 'light' ? (
+            <>
+              <button className={`map2-toggle-btn${map2SubMode==='pic1'?' active':''}`} onClick={()=>setMap2SubMode('pic1')}>{lang==='en'?'Img 1':'图1'}</button>
+              <button className={`map2-toggle-btn${map2SubMode==='pic2'?' active':''}`} onClick={()=>setMap2SubMode('pic2')}>{lang==='en'?'Img 2':'图2'}</button>
+            </>
+          ) : (
+            <>
+              <button className={`map2-toggle-btn${map2SubMode==='show'?' active':''}`} onClick={()=>setMap2SubMode('show')}>{lang==='en'?'View':'展示'}</button>
+              <button className={`map2-toggle-btn${map2SubMode==='roam'?' active':''}`} onClick={()=>setMap2SubMode('roam')}>{lang==='en'?'Roam':'漫游'}</button>
+            </>
+          )}
         </div>
       )}
       {(viewMode === 'model' || viewMode === 'day' || viewMode === 'night') && <Scene3D mode={viewMode}/>}
 
       {/* top KPIs */}
-      <TopBar focusPlant={focusPlant} plants={tenantPlants} agg={tenantAgg} onPlantChange={setFocusId} tenant={tenant} tenantIdx={tenantIdx} onTenant={onTenantChange} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang}/>
+      <TopBar focusPlant={focusPlant} plants={tenantPlants} agg={tenantAgg} onPlantChange={setFocusId} tenant={tenant} tenantIdx={tenantIdx} onTenant={onTenantChange} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang} theme={theme} onTheme={toggleTheme}/>
 
       {/* left + right rails over map */}
       <div className="stage">
