@@ -93,7 +93,7 @@ const TENANTS = [
 // Plants — positioned in the abstract map (vw% / vh% of map area)
 // mapX / mapY → % position on map2 city background (per-tenant; tenants don't share pins)
 const PLANTS = [
-  // ── Tenant: ILP (International Landing Plants) · 3 plants ───────────────
+  // ── Tenant: ILP (International Landing Plants) · 7 plants ───────────────
   { id: 'p2', name: 'ILP · Banten-A', enName: 'ILP · Banten-A',    short: 'Banten-A',  tenant: 'ilp', region: 'Indonesia·万丹',  enRegion: 'Indonesia · Banten',   city: '万丹',     enCity: 'Banten',
     capacity: 50.0, power: 31.7, gen: 218.4, alerts: 3, risk: 'mid',  status: '托管中',   enStatus: 'Managed',
     x: 78, y: 68, mapX: '62%', mapY: '55%', agents: ['ops','warn','alert','diag','order','sched','query'] },
@@ -103,6 +103,18 @@ const PLANTS = [
   { id: 'p6', name: 'ILP · Selangor', enName: 'ILP · Selangor',    short: 'Selangor',  tenant: 'ilp', region: 'Malaysia·吉隆坡', enRegion: 'Malaysia · Kuala Lumpur', city: '吉隆坡', enCity: 'Kuala Lumpur',
     capacity: 36.5, power: 22.4, gen: 158.2, alerts: 4, risk: 'mid',  status: '托管中',   enStatus: 'Managed',
     x: 64, y: 74, mapX: '75%', mapY: '53%', agents: ['ops','warn','alert','diag','order','sched','query'] },
+  { id: 'p8', name: 'ILP · 巴厘南站',  enName: 'ILP · Bali-South',   short: 'Bali-S',    tenant: 'ilp', region: 'Indonesia·巴厘', enRegion: 'Indonesia · Bali',    city: '巴厘',     enCity: 'Bali',
+    capacity: 48.0, power: 30.2, gen: 195.0, alerts: 2, risk: 'low',  status: '托管中',   enStatus: 'Managed',
+    x: 86, y: 36, mapX: '88%', mapY: '30%', agents: ['ops','warn','alert','diag','order','sched','query'] },
+  { id: 'p9', name: 'ILP · 马尼拉东站', enName: 'ILP · Manila-East', short: 'Manila-E',  tenant: 'ilp', region: 'Philippines·马尼拉', enRegion: 'Philippines · Manila', city: '马尼拉', enCity: 'Manila',
+    capacity: 38.0, power: 24.5, gen: 158.0, alerts: 1, risk: 'low',  status: '托管中',   enStatus: 'Managed',
+    x: 70, y: 78, mapX: '70%', mapY: '75%', agents: ['ops','warn','alert','diag','order','sched','query'] },
+  { id: 'p10', name: 'ILP · 槟城西站', enName: 'ILP · Penang-West',  short: 'Penang-W',  tenant: 'ilp', region: 'Malaysia·槟城',  enRegion: 'Malaysia · Penang',    city: '槟城',     enCity: 'Penang',
+    capacity: 32.0, power: 20.0, gen: 138.0, alerts: 3, risk: 'mid',  status: '托管中',   enStatus: 'Managed',
+    x: 55, y: 32, mapX: '55%', mapY: '35%', agents: ['ops','warn','alert','diag','order','sched','query'] },
+  { id: 'p11', name: 'ILP · 河内北站', enName: 'ILP · Hanoi-North',  short: 'Hanoi-N',   tenant: 'ilp', region: 'Vietnam·河内',   enRegion: 'Vietnam · Hanoi',      city: '河内',     enCity: 'Hanoi',
+    capacity: 28.0, power: 17.2, gen: 115.0, alerts: 0, risk: 'low',  status: '托管中',   enStatus: 'Managed',
+    x: 48, y: 72, mapX: '50%', mapY: '70%', agents: ['ops','warn','alert','diag','order','sched','query'] },
 
   // ── Tenant: fux (河源·福曦能源) · 5 plants ───────────────────────────────
   { id: 'p1', name: '福曦·东源一号',  enName: 'Fux · Dongyuan #01', short: '东源 #01', tenant: 'fux', region: '广东·河源',      enRegion: 'Guangdong · Heyuan',   city: '河源',     enCity: 'Heyuan',
