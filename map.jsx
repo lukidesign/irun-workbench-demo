@@ -96,7 +96,7 @@ function Map2Overlay({ focusId, onFocus, subMode, tenantId }) {
   const visible = _MAP_PLANTS.filter(p => (!tenantId || p.tenant === tenantId) && p.mapX && p.mapY);
   return (
     <div className="map2-overlay">
-      {subMode === 'show' && (
+      {(subMode === 'show' || subMode === 'pic1' || subMode === 'pic2') && (
         <>
           <div className="patrol-robot patrol-robot-1" aria-hidden="true">
             <img src="IRunRobot.png" alt=""/>
