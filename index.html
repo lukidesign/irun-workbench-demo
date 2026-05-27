@@ -1314,11 +1314,29 @@ body{
   box-shadow:0 0 0 1px rgba(34,211,238,0.15), 0 30px 90px rgba(0,0,0,0.6);
   position:relative;
   display:grid;grid-template-rows:auto 1fr auto;
-  opacity:1;
+  opacity:1;min-height:0;
 }
+.detail-body{
+  display:grid;grid-template-columns:1fr 5fr;
+  min-height:0;overflow:hidden;
+}
+.detail-left{
+  display:flex;flex-direction:column;gap:10px;padding:14px;
+  border-right:1px solid var(--line);
+  overflow:hidden;min-height:0;
+}
+.detail-right{
+  position:relative;overflow:hidden;min-height:0;
+  display:flex;
+}
+.detail-right > .scene-stage{ flex:1; min-width:0; min-height:0; }
 @keyframes detail-in{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}}
 .detail-hd{
+  position:relative;
   display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line);
+}
+.detail-hd .mode-tabs.hd-center{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
 }
 .detail-hd .title{display:flex;flex-direction:column;gap:3px}
 .detail-hd .title b{font-family:var(--font-display);font-size:18px;color:#fff;font-weight:600;letter-spacing:0.06em}
@@ -1858,10 +1876,12 @@ body{
 /* ------ scenario log overlay inside detail ------ */
 /* digital team panel */
 .team-panel{
-  position:absolute;right:14px;top:14px;width:270px;
+  position:relative;width:100%;
   background:rgba(6,10,22,0.88);border:1px solid var(--line);
   display:flex;flex-direction:column;overflow:hidden;
+  flex:0 0 auto;max-height:45%;
 }
+.detail-left .team-panel{ max-height:45% }
 .team-panel h4{
   padding:8px 12px;border-bottom:1px solid var(--line);
   font-family:var(--font-display);font-size:10.5px;letter-spacing:0.18em;text-transform:uppercase;
@@ -1892,8 +1912,10 @@ body{
 .team-row .ts.alert{color:var(--rose);border-color:rgba(248,113,113,0.35)}
 
 .scene-log{
-  position:absolute;right:14px;width:270px;max-height:400px;
-  background:rgba(6,10,22,0.85);border:1px solid var(--line);overflow:hidden;display:flex;flex-direction:column;
+  position:relative;width:100%;
+  background:rgba(6,10,22,0.85);border:1px solid var(--line);
+  overflow:hidden;display:flex;flex-direction:column;
+  flex:1 1 auto;min-height:0;
 }
 .scene-log h4{padding:8px 12px;border-bottom:1px solid var(--line);font-family:var(--font-display);font-size:10.5px;
   letter-spacing:0.18em;text-transform:uppercase;color:var(--text-dim);font-weight:600;display:flex;justify-content:space-between;align-items:center}

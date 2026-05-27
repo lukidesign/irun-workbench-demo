@@ -109,14 +109,14 @@ function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx,
             <b>{zh ? plant.name : (plant.enName || plant.name)}</b>
             <small>{zh ? plant.region : (plant.enRegion || plant.region)} · {plant.capacity} MW · {zh?'实时功率':'Live'} {plant.power} MW · {zh?'智能体':'Agents'} {plant.agents.length}/10</small>
           </div>
+          <div className="mode-tabs hd-center">
+            <button className={mode==='auto'?'on':''} onClick={()=>onModeChange('auto')}>{zh?'托管模式':'Auto'}</button>
+            <button className={mode==='command'?'on':''} onClick={()=>onModeChange('command')}>{zh?'指挥模式':'Command'}</button>
+          </div>
           <div className="stats">
             <div className="s"><span className="l">{zh?'日发电':"Today's Gen"}</span><span className="v mono">{plant.gen}<small style={{color:'var(--text-mute)',fontSize:10,marginLeft:4}}>MWh</small></span></div>
             <div className="s"><span className="l">{zh?'告警':'Alerts'}</span><span className="v mono" style={{color: plant.alerts>4?'var(--rose)':'#fff'}}>{plant.alerts}</span></div>
             <div className="s"><span className="l">PR</span><span className="v mono">{(82+plant.id.charCodeAt(1)%7).toFixed(1)}%</span></div>
-            <div className="mode-tabs">
-              <button className={mode==='auto'?'on':''} onClick={()=>onModeChange('auto')}>{zh?'托管模式':'Auto'}</button>
-              <button className={mode==='command'?'on':''} onClick={()=>onModeChange('command')}>{zh?'指挥模式':'Command'}</button>
-            </div>
             <div className="detail-close" onClick={onClose}>×</div>
           </div>
         </div>
@@ -127,7 +127,19 @@ function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx,
           </div>
         )}
 
-        <SceneStage plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur} mode={mode}/>
+        <div className="detail-body">
+          <div className="detail-left">
+            <DigitalTeam plant={plant} activeAgentIds={(() => {
+              const s = new Set();
+              scenario.steps.slice(0, stepIdx+1).slice(-3).forEach(st => { s.add(st.from); s.add(st.to); });
+              return s;
+            })()}/>
+            <SceneLog scenario={scenario} steps={scenario.steps.slice(0, stepIdx+1)} plant={plant}/>
+          </div>
+          <div className="detail-right">
+            <SceneStage plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur} mode={mode}/>
+          </div>
+        </div>
 
         <div className="scenario-timeline">
           <div className="lbl">{scenario.title}</div>
@@ -251,8 +263,6 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
         </div>
       )}
 
-      <DigitalTeam plant={plant} activeAgentIds={activeAgentIds}/>
-      <SceneLog scenario={scenario} steps={visibleSteps} plant={plant}/>
       <TokenStrip plant={plant} stepIdx={stepIdx}/>
 
       <div className="legend">
@@ -307,15 +317,11 @@ function DigitalTeam({plant, activeAgentIds}){
 function SceneLog({scenario, steps, plant}){
   const zh = _useD_Lang() !== 'en';
   const ref = useRef(null);
-  // header(35) + 10 rows × 30px (more compact) = 335
-  const teamRows = 10;
-  const teamH = 35 + teamRows * 30;
-  const topOffset = 14 + teamH + 10;
   useEffect(()=>{
     if(ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   },[steps.length]);
   return (
-    <div className="scene-log" style={{top: topOffset+'px'}}>
+    <div className="scene-log">
       <h4>
         <span>{zh?'多 Agent 协同日志':'Multi-Agent Log'}</span>
         <span className="badge">{scenario.id} · {steps.length}/{scenario.steps.length}</span>
