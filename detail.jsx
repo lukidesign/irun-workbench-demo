@@ -106,8 +106,8 @@ function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx,
         <span className="c1"/>
         <div className="detail-hd">
           <div className="title">
-            <b>{plant.name}</b>
-            <small>{plant.region} · {plant.capacity} MW · {zh?'实时功率':'Live'} {plant.power} MW · {zh?'智能体':'Agents'} {plant.agents.length}/10</small>
+            <b>{zh ? plant.name : (plant.enName || plant.name)}</b>
+            <small>{zh ? plant.region : (plant.enRegion || plant.region)} · {plant.capacity} MW · {zh?'实时功率':'Live'} {plant.power} MW · {zh?'智能体':'Agents'} {plant.agents.length}/10</small>
           </div>
           <div className="stats">
             <div className="s"><span className="l">{zh?'日发电':"Today's Gen"}</span><span className="v mono">{plant.gen}<small style={{color:'var(--text-mute)',fontSize:10,marginLeft:4}}>MWh</small></span></div>
@@ -185,7 +185,7 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
           })}
         </div>
         <div style={{position:'absolute',left:8,top:8,fontSize:10,color:'var(--text-mute)',fontFamily:'var(--font-mono)',letterSpacing:'0.08em'}}>
-          PV-ARRAY · 12×8 · {zh ? plant.short : (plant.name.split(/[·]/).pop() || plant.short)}
+          PV-ARRAY · 12×8 · {((zh ? plant.name : (plant.enName||plant.name)).split('·').pop() || plant.short).trim()}
         </div>
         <div style={{position:'absolute',right:8,bottom:8,fontSize:10,color:'var(--text-mute)',fontFamily:'var(--font-mono)',letterSpacing:'0.08em'}}>
           INV-{plant.id.toUpperCase()}-{['A','B','C','D'][plant.id.charCodeAt(1)%4]}
@@ -422,11 +422,11 @@ function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress,
   return (
     <div className="pid-card pid-c-kpi" onClick={onOpen}>
       <div className="pid-k-top">
-        <b className="pid-k-name">{plant.name}</b>
+        <b className="pid-k-name">{zh ? plant.name : (plant.enName || plant.name)}</b>
         <button className="pid-k-btn">▶ {zh?'播放':'Play'}</button>
         <button className="pid-k-btn">⛶ {zh?'全屏':'Full'}</button>
       </div>
-      <div className="pid-k-sub">{plant.region} · {plant.capacity} MW · {zh?'实时功率':'Live'} {plant.power} MW</div>
+      <div className="pid-k-sub">{zh ? plant.region : (plant.enRegion || plant.region)} · {plant.capacity} MW · {zh?'实时功率':'Live'} {plant.power} MW</div>
       <div className="pid-k-stats">
         <div className="s"><span className="l">{zh?'日发电':"Today's Gen"}</span><span className="v">{plant.gen}<small>MWh</small></span></div>
         <div className="s"><span className="l">{zh?'告警':'Alerts'}</span><span className="v" style={{color: plant.alerts>4?'var(--rose)':'#fff'}}>{plant.alerts}</span></div>

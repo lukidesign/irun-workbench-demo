@@ -119,6 +119,8 @@ function Map2Overlay({ focusId, onFocus, subMode, tenantId }) {
           : plant.risk==='mid'
             ? (zh?'△ 关注':'△ Watch')
             : (zh?'✓ 正常':'✓ Normal');
+        const fullName = zh ? plant.name : (plant.enName || plant.name);
+        const pinName = (fullName.split('·').pop() || plant.short).trim();
         return (
           <div
             key={plant.id}
@@ -131,7 +133,7 @@ function Map2Overlay({ focusId, onFocus, subMode, tenantId }) {
             onClick={() => onFocus(plant.id)}
           >
             <div className="map2-pin-label">
-              <span className="map2-pin-name">{plant.short}</span>
+              <span className="map2-pin-name">{pinName}</span>
               <span className="map2-pin-meta">{plant.power}MW · {statusLabel}</span>
             </div>
             <div className="map2-pin-line"/>

@@ -158,9 +158,21 @@ function App(){
       {(viewMode === 'map2' && map2SubMode === 'show') && (
         <div className="scene-img-bg" style={{backgroundImage:`url('rjgf001.png')`}}/>
       )}
+      {(viewMode === 'map2' && map2SubMode === 'pic1') && (
+        <div className="scene-img-bg" style={{backgroundImage:`url('rjgf005.png')`}}/>
+      )}
+      {(viewMode === 'map2' && map2SubMode === 'pic2') && (
+        <div className="scene-img-bg" style={{backgroundImage:`url('rjgf004.png')`}}/>
+      )}
+      {(viewMode === 'map2' && map2SubMode === 'pic3') && (
+        <div className="scene-img-bg" style={{backgroundImage:`url('rjgf001qian.png')`}}/>
+      )}
       {/* map2 漫游 — video background */}
       {(viewMode === 'map2' && map2SubMode === 'roam') && (
         <video className="scene-video-bg" src="manyou001.mp4" autoPlay loop playsInline/>
+      )}
+      {(viewMode === 'map2' && map2SubMode === 'vid3') && (
+        <video className="scene-video-bg" src="rjgf001qian.mp4" autoPlay loop playsInline/>
       )}
 
       {/* full-screen plants map / 3D scene */}
@@ -170,6 +182,10 @@ function App(){
       {/* map2 展示/漫游 toggle */}
       {viewMode === 'map2' && (
         <div className="map2-toggle">
+          <button className={`map2-toggle-btn${map2SubMode==='pic1'?' active':''}`} onClick={()=>setMap2SubMode('pic1')}>{lang==='en'?'Img 1':'图1'}</button>
+          <button className={`map2-toggle-btn${map2SubMode==='pic2'?' active':''}`} onClick={()=>setMap2SubMode('pic2')}>{lang==='en'?'Img 2':'图2'}</button>
+          <button className={`map2-toggle-btn${map2SubMode==='pic3'?' active':''}`} onClick={()=>setMap2SubMode('pic3')}>{lang==='en'?'Img 3':'图3'}</button>
+          <button className={`map2-toggle-btn${map2SubMode==='vid3'?' active':''}`} onClick={()=>setMap2SubMode('vid3')}>{lang==='en'?'Video 3':'视频3'}</button>
           <button className={`map2-toggle-btn${map2SubMode==='show'?' active':''}`} onClick={()=>setMap2SubMode('show')}>{lang==='en'?'View':'展示'}</button>
           <button className={`map2-toggle-btn${map2SubMode==='roam'?' active':''}`} onClick={()=>setMap2SubMode('roam')}>{lang==='en'?'Roam':'漫游'}</button>
         </div>

@@ -94,7 +94,7 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
                       e.stopPropagation();
                       setPlantPickerOpen(o=>!o);
                     }}>
-              <span className="picker-btn-name">{focusPlant.name}</span>
+              <span className="picker-btn-name">{zh ? focusPlant.name : (focusPlant.enName || focusPlant.name)}</span>
               <span className={`picker-caret${plantPickerOpen?' open':''}`}>▼</span>
             </button>
             {plantPickerOpen && (
@@ -110,7 +110,7 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
                          setPlantPickerOpen(false);
                        }}>
                     <span className={`cpm-dot cpm-dot-${p.risk||'low'}`}/>
-                    <span className="cpm-name">{p.name}</span>
+                    <span className="cpm-name">{zh ? p.name : (p.enName || p.name)}</span>
                     <span className="cpm-meta">{p.capacity.toFixed(1)} MW</span>
                   </div>
                 ))}
@@ -1155,8 +1155,8 @@ function PlantTitle({plant, plants, onChange}){
       <div className="pt-corner pt-corner-br"/>
       <button className="pt-main" onClick={()=>setOpen(o=>!o)}>
         <span className="pt-dot"/>
-        <span className="pt-name">{plant.name}</span>
-        <span className="pt-region">{plant.region}</span>
+        <span className="pt-name">{zh ? plant.name : (plant.enName || plant.name)}</span>
+        <span className="pt-region">{zh ? plant.region : (plant.enRegion || plant.region)}</span>
         <span className={`pt-caret${open?' open':''}`}>▾</span>
       </button>
       {open && (
@@ -1167,7 +1167,7 @@ function PlantTitle({plant, plants, onChange}){
                  className={`pt-item${p.id===plant.id?' active':''}`}
                  onClick={()=>{ onChange(p.id); setOpen(false); }}>
               <span className={`pt-i-dot pt-i-dot-${p.risk||'low'}`}/>
-              <span className="pt-i-name">{p.name}</span>
+              <span className="pt-i-name">{zh ? p.name : (p.enName || p.name)}</span>
               <span className="pt-i-meta">{p.capacity.toFixed(1)} MW</span>
             </div>
           ))}
