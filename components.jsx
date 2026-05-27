@@ -1477,8 +1477,49 @@ function PlantAgentField({plant, busyMap, cur}){
   if (!plant?.robotField?.length) return null;
   // The "speaker" of the current step bubble = the actor (from), fallback to (to)
   const speaker = cur ? (busyMap && busyMap[cur.from] ? cur.from : (busyMap && busyMap[cur.to] ? cur.to : null)) : null;
+  // Build position map for line endpoints
+  const posMap = {};
+  plant.robotField.forEach(r => { posMap[r.agent] = {x: r.x, y: r.y}; });
+  const fromPos = cur && posMap[cur.from];
+  const toPos = cur && posMap[cur.to];
+  const lineColor = !cur ? '#22d3ee'
+                  : cur.type === 'action' ? '#fbbf24'
+                  : cur.tag === '安全' ? '#f87171'
+                  : '#22d3ee';
   return (
     <div className="plant-agent-field" aria-hidden="true">
+      {/* connection lines: current scenario step (from → to) — 3px line */}
+      <svg className="paf-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {fromPos && toPos && cur.from !== cur.to && (
+          <g key={`ln-${cur.from}-${cur.to}-${cur.t}`}>
+            <line x1={fromPos.x} y1={fromPos.y} x2={toPos.x} y2={toPos.y}
+                  stroke={lineColor} strokeWidth="3"
+                  strokeDasharray="14 8" opacity="0.85"
+                  vectorEffect="non-scaling-stroke"
+                  style={{filter:`drop-shadow(0 0 6px ${lineColor})`}}>
+              <animate attributeName="stroke-dashoffset" from="0" to="-44" dur="0.8s" repeatCount="indefinite"/>
+            </line>
+          </g>
+        )}
+      </svg>
+      {/* moving particle — true 6px round dot, animated via dynamic @keyframes */}
+      {fromPos && toPos && cur && cur.from !== cur.to && (
+        <>
+          <style>{`@keyframes paf-particle-${cur.from}-${cur.to}{
+            0%   { left:${fromPos.x}%; top:${fromPos.y}%; opacity:0.2; }
+            10%  { opacity:1; }
+            90%  { opacity:1; }
+            100% { left:${toPos.x}%; top:${toPos.y}%; opacity:0.2; }
+          }`}</style>
+          <div className="paf-particle"
+               key={`p-${cur.from}-${cur.to}-${cur.t}`}
+               style={{
+                 background: lineColor,
+                 boxShadow: `0 0 10px ${lineColor}, 0 0 18px ${lineColor}`,
+                 animation: `paf-particle-${cur.from}-${cur.to} 1.4s linear infinite`,
+               }}/>
+        </>
+      )}
       {plant.robotField.map((r, i) => {
         if (r.agent === 'drone') {
           // Drone flies along a serpentine inspection route over the PV arrays.
