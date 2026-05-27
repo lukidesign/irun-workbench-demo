@@ -399,7 +399,7 @@ const _SESSIONS_SEED = [
     ]},
 ];
 
-function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, onCollapse}){
+function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, onCollapse, mode, onDispatchCommand}){
   const [sessions, setSessions] = useState(_SESSIONS_SEED);
   const [currentId, setCurrentId] = useState('s_cur');
   const [input, setInput] = useState('');
@@ -518,6 +518,11 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
   const send = (text, agentId) => {
     if(!text.trim()) return;
     const targetId = agentId || selectedAgent || 'ops';
+    // In command mode → dispatch a walking robot with the cleaned command text
+    if (mode === 'command' && onDispatchCommand){
+      const cleanText = text.replace(/^@\S+\s*/, '').trim();
+      onDispatchCommand(targetId, cleanText || text);
+    }
     const userMsg = { role:'user', text };
     const agentMsg = { role:'agent', agent: targetId, text: respondTo(text, targetId, focusPlant) };
     setSessions(prev => prev.map(s => {
@@ -1383,7 +1388,136 @@ function PlantRobot(){
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, useClock, fmtTime, fmtDate, LangCtx };
+// ── DispatchedRobot ───────────────────────────────────────────────────
+// In command mode: a single iRun robot walks PLANT_ROBOT_PATH to the target,
+// shows a bubble with the dispatched command, then fades and self-unmounts.
+function DispatchedRobot({id, agentId, text, onDone}){
+  const [st, setSt] = useState({x: PLANT_ROBOT_PATH[0].x, y: PLANT_ROBOT_PATH[0].y, facingLeft: true, opacity: 0, walk: false});
+  const [showBubble, setShowBubble] = useState(false);
+  const startRef = useRef(null);
+  const rafRef = useRef(null);
+  const doneRef = useRef(false);
+  const ag = _ABI[agentId];
+
+  useEffect(()=>{
+    const walkDur = 9;      // s — walk along path
+    const lingerDur = 5;    // s — bubble + execute
+    const fadeDur = 1;      // s — fade out
+    const totalDur = walkDur + lingerDur + fadeDur;
+
+    const tick = (t) => {
+      if(!startRef.current) startRef.current = t;
+      const elapsed = (t - startRef.current) / 1000;
+
+      if (elapsed < walkDur){
+        const u = elapsed / walkDur;
+        const segPos = u * (PLANT_ROBOT_PATH.length - 1);
+        const idx = Math.min(Math.floor(segPos), PLANT_ROBOT_PATH.length - 2);
+        const localU = segPos - idx;
+        const p0 = PLANT_ROBOT_PATH[idx];
+        const p1 = PLANT_ROBOT_PATH[idx+1];
+        const x = p0.x + (p1.x - p0.x) * localU;
+        const y = p0.y + (p1.y - p0.y) * localU;
+        const facingLeft = (p1.x - p0.x) < 0;
+        const opacity = Math.min(1, elapsed / 0.6);
+        setSt({x, y, facingLeft, opacity, walk: true});
+      } else if (elapsed < walkDur + lingerDur){
+        const last = PLANT_ROBOT_PATH[PLANT_ROBOT_PATH.length-1];
+        setSt({x: last.x, y: last.y, facingLeft: false, opacity: 1, walk: false});
+        setShowBubble(prev => prev ? prev : true);
+      } else if (elapsed < totalDur){
+        const last = PLANT_ROBOT_PATH[PLANT_ROBOT_PATH.length-1];
+        const u = (elapsed - walkDur - lingerDur) / fadeDur;
+        setSt({x: last.x, y: last.y - u*3, facingLeft: false, opacity: 1-u, walk: false});
+      } else {
+        if (!doneRef.current){ doneRef.current = true; onDone?.(id); }
+        return;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return ()=>{ if(rafRef.current) cancelAnimationFrame(rafRef.current); };
+  },[]);
+
+  return (
+    <div className={`plant-robot dispatched${st.facingLeft?' flip':''}${st.walk?' walking':''}`}
+         style={{left:st.x+'%', top:st.y+'%', opacity:st.opacity}}>
+      <div className="pr-shadow"/>
+      <div className="pr-sprite"><img src="IRunRobot.png" alt="robot"/></div>
+      <div className="pr-glow"/>
+      {showBubble && ag && (
+        <div className={`pr-bubble${st.facingLeft?'':' flip'}`}>
+          <div className="pr-bubble-head">
+            <span className="pr-bubble-code">{ag.code}</span>
+            <span className="pr-bubble-tag">执行</span>
+          </div>
+          <div className="pr-bubble-text">{text}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DispatchedRobots({robots, onRobotDone}){
+  if (!robots?.length) return null;
+  return (
+    <div className="dispatched-robots-layer" aria-hidden="true">
+      {robots.map(r => (
+        <DispatchedRobot key={r.id} id={r.id} agentId={r.agentId} text={r.text} onDone={onRobotDone}/>
+      ))}
+    </div>
+  );
+}
+
+// ── PlantAgentField ───────────────────────────────────────────────────
+// Renders a fleet of static RobotAvatars at plant.robotField positions.
+// Active agents (busyMap hit) glow + lift. Used in img2 when a plant
+// provides robotField data; otherwise the single walking PlantRobot is used.
+function PlantAgentField({plant, busyMap, cur}){
+  if (!plant?.robotField?.length) return null;
+  // The "speaker" of the current step bubble = the actor (from), fallback to (to)
+  const speaker = cur ? (busyMap && busyMap[cur.from] ? cur.from : (busyMap && busyMap[cur.to] ? cur.to : null)) : null;
+  return (
+    <div className="plant-agent-field" aria-hidden="true">
+      {plant.robotField.map((r, i) => {
+        if (r.agent === 'drone') {
+          // Drone flies along a serpentine inspection route over the PV arrays.
+          // No inline left/top — the @keyframes paf-drone-fly animation drives motion.
+          return (
+            <div key={i} className="paf-drone paf-drone-flying">
+              <img src="wrj001.png" alt=""/>
+              <div className="paf-badge paf-badge-drone">UAV</div>
+            </div>
+          );
+        }
+        const ag = _ABI[r.agent];
+        if (!ag) return null;
+        const active = !!(busyMap && busyMap[r.agent]);
+        const showBubble = active && cur && (r.agent === speaker);
+        const tagClass = cur?.tag ? ` tag-${cur.type==='action'?'mid':(cur.tag==='安全'?'high':'low')}` : '';
+        return (
+          <div key={i}
+               className={`paf-robot${active?' active':''}`}
+               style={{left:`${r.x}%`, top:`${r.y}%`, animationDelay:`${i*0.3}s`}}>
+            {showBubble && (
+              <div className={`paf-bubble${tagClass}`} key={`b-${cur.text}`}>
+                <div className="paf-bubble-head">
+                  <span className="paf-bubble-code">{ag.code}</span>
+                  {cur.tag && <span className="paf-bubble-tag">{cur.tag}</span>}
+                </div>
+                <div className="paf-bubble-text">{cur.text}</div>
+              </div>
+            )}
+            <RobotAvatar agent={ag} size={56} glow={active}/>
+            <div className="paf-badge">{ag.code}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, PlantAgentField, DispatchedRobots, useClock, fmtTime, fmtDate, LangCtx };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left

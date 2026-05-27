@@ -117,8 +117,6 @@ function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx,
               <button className={mode==='auto'?'on':''} onClick={()=>onModeChange('auto')}>{zh?'托管模式':'Auto'}</button>
               <button className={mode==='command'?'on':''} onClick={()=>onModeChange('command')}>{zh?'指挥模式':'Command'}</button>
             </div>
-            <button className="detail-btn" onClick={openVideo}>▶ {zh?'播放':'Play'}</button>
-            <button className="detail-btn fs" onClick={toggleFullscreen}>⛶ {zh?'全屏':'Full'}</button>
             <div className="detail-close" onClick={onClose}>×</div>
           </div>
         </div>
@@ -424,7 +422,6 @@ function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress,
       <div className="pid-k-top">
         <b className="pid-k-name">{zh ? plant.name : (plant.enName || plant.name)}</b>
         <button className="pid-k-btn">▶ {zh?'播放':'Play'}</button>
-        <button className="pid-k-btn">⛶ {zh?'全屏':'Full'}</button>
       </div>
       <div className="pid-k-sub">{zh ? plant.region : (plant.enRegion || plant.region)} · {plant.capacity} MW · {zh?'实时功率':'Live'} {plant.power} MW</div>
       <div className="pid-k-stats">

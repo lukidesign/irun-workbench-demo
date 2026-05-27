@@ -1513,6 +1513,179 @@ body{
   50%    {opacity:0.95}
 }
 
+/* ── Dispatched Robots (command-mode walkers + execution bubble) ────── */
+.dispatched-robots-layer{
+  position:absolute;inset:0;pointer-events:none;z-index:6;
+}
+.plant-robot.dispatched .pr-glow{
+  background:radial-gradient(ellipse, rgba(167,139,250,0.45), transparent 70%);
+}
+.pr-bubble{
+  position:absolute;
+  left:50%;bottom:calc(100% + 4px);
+  transform:translateX(-50%);
+  min-width:160px;max-width:260px;
+  padding:7px 10px 8px;
+  background:rgba(6,12,24,0.92);
+  border:1px solid var(--violet);
+  box-shadow:0 0 14px rgba(167,139,250,0.55), 0 6px 14px rgba(0,0,0,0.55);
+  color:#e8f6fb;
+  z-index:9;
+  pointer-events:none;
+  animation:pr-bubble-in 0.32s ease-out both;
+  white-space:normal;
+}
+.pr-bubble::after{
+  content:"";position:absolute;left:50%;top:100%;
+  transform:translateX(-50%);
+  width:0;height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:7px solid var(--violet);
+}
+.pr-bubble-head{ display:flex;align-items:center;gap:6px;margin-bottom:3px; }
+.pr-bubble-code{
+  font:700 9px var(--font-mono);letter-spacing:.12em;color:var(--violet);
+}
+.pr-bubble-tag{
+  font:600 9px var(--font-cn);letter-spacing:.06em;
+  padding:1px 5px;
+  background:rgba(167,139,250,0.16);color:#ddd6fe;
+  border:1px solid rgba(167,139,250,0.45);
+}
+.pr-bubble-text{ font:500 12px/1.45 var(--font-cn);color:#dbeaf2; }
+@keyframes pr-bubble-in{
+  0%   { opacity:0; transform:translateX(-50%) translateY(6px) scale(0.92); }
+  100% { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
+}
+
+/* ── Plant Agent Field (multi-robot static layout) ──────────────────── */
+.plant-agent-field{
+  position:absolute;inset:0;pointer-events:none;z-index:5;
+}
+.paf-robot,
+.paf-drone{
+  position:absolute;
+  transform:translate(-50%,-50%);
+  animation:paf-bob 3.4s ease-in-out infinite;
+  transition:filter .4s ease;
+}
+.paf-robot{ animation-name:paf-bob; }
+.paf-drone{ animation-name:paf-drone-hover; animation-duration:2.6s; }
+.paf-badge{
+  position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);
+  font:600 9px var(--font-mono);letter-spacing:0.1em;
+  padding:1px 6px;border-radius:2px;
+  background:rgba(6,12,24,0.85);
+  border:1px solid var(--line);
+  color:var(--text-dim);
+  white-space:nowrap;
+  transition:color .3s,border-color .3s,background .3s;
+}
+.paf-robot.active{
+  filter:drop-shadow(0 0 10px rgba(34,211,238,0.85));
+  z-index:6;
+}
+.paf-robot.active .paf-badge{
+  color:#fff;
+  border-color:var(--cyan);
+  background:rgba(34,211,238,0.22);
+}
+.paf-badge-drone{ color:var(--amber);border-color:rgba(251,191,36,0.45); }
+.paf-drone img{
+  width:52px;height:52px;
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,0.55));
+  display:block;
+}
+@keyframes paf-bob{
+  0%,100%{ transform:translate(-50%,-50%) translateY(0); }
+  50%    { transform:translate(-50%,-50%) translateY(-4px); }
+}
+@keyframes paf-drone-hover{
+  0%,100%{ transform:translate(-50%,-50%) translateY(-3px); }
+  50%    { transform:translate(-50%,-50%) translateY(3px); }
+}
+
+/* UAV serpentine inspection route over PV arrays:
+   sweeps 4 columns (52→58→64→70) up/down, then returns to UAV pad (78,42), loop. */
+.paf-drone-flying{
+  animation: paf-drone-fly 36s linear infinite, paf-drone-hover 2.6s ease-in-out infinite;
+}
+@keyframes paf-drone-fly{
+  0%   { left:52%; top:28%; }
+  10%  { left:52%; top:56%; }
+  14%  { left:58%; top:56%; }
+  24%  { left:58%; top:28%; }
+  28%  { left:64%; top:28%; }
+  38%  { left:64%; top:56%; }
+  42%  { left:70%; top:56%; }
+  52%  { left:70%; top:28%; }
+  60%  { left:78%; top:35%; }
+  70%  { left:78%; top:42%; }
+  80%  { left:78%; top:42%; }
+  92%  { left:52%; top:28%; }
+  100% { left:52%; top:28%; }
+}
+
+/* Active robot speech bubble — shows current scenario step text */
+.paf-bubble{
+  position:absolute;left:50%;bottom:calc(100% + 10px);
+  transform:translateX(-50%);
+  min-width:140px;max-width:240px;
+  padding:7px 10px 8px;
+  background:rgba(6,12,24,0.92);
+  border:1px solid var(--cyan);
+  box-shadow:0 0 14px rgba(34,211,238,0.45), 0 6px 14px rgba(0,0,0,0.55);
+  color:#e8f6fb;
+  z-index:8;
+  pointer-events:none;
+  animation:paf-bubble-in 0.32s ease-out both;
+  white-space:normal;
+}
+.paf-bubble::after{
+  content:"";position:absolute;left:50%;top:100%;
+  transform:translateX(-50%);
+  width:0;height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:7px solid var(--cyan);
+}
+.paf-bubble.tag-high{ border-color:#f87171; box-shadow:0 0 14px rgba(248,113,113,0.5), 0 6px 14px rgba(0,0,0,0.55); }
+.paf-bubble.tag-high::after{ border-top-color:#f87171; }
+.paf-bubble.tag-mid{ border-color:var(--amber); box-shadow:0 0 14px rgba(251,191,36,0.5), 0 6px 14px rgba(0,0,0,0.55); }
+.paf-bubble.tag-mid::after{ border-top-color:var(--amber); }
+.paf-bubble-head{
+  display:flex;align-items:center;gap:6px;
+  margin-bottom:3px;
+}
+.paf-bubble-code{
+  font:700 9px var(--font-mono);letter-spacing:.12em;
+  color:var(--cyan);
+}
+.paf-bubble.tag-high .paf-bubble-code{ color:#fca5a5; }
+.paf-bubble.tag-mid .paf-bubble-code{ color:var(--amber); }
+.paf-bubble-tag{
+  font:600 9px var(--font-cn);letter-spacing:.06em;
+  padding:1px 5px;
+  background:rgba(34,211,238,0.14);
+  color:#bdf1fb;
+  border:1px solid rgba(34,211,238,0.35);
+}
+.paf-bubble.tag-high .paf-bubble-tag{
+  background:rgba(248,113,113,0.16);color:#fecaca;border-color:rgba(248,113,113,0.45);
+}
+.paf-bubble.tag-mid .paf-bubble-tag{
+  background:rgba(251,191,36,0.14);color:#fde68a;border-color:rgba(251,191,36,0.45);
+}
+.paf-bubble-text{
+  font:500 12px/1.45 var(--font-cn);
+  color:#dbeaf2;
+}
+@keyframes paf-bubble-in{
+  0%   { opacity:0; transform:translateX(-50%) translateY(6px) scale(0.92); }
+  100% { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
+}
+
 .skill-entry-btn{
   margin:6px 8px 8px;padding:8px 4px 9px;
   border:1px solid rgba(34,211,238,0.2);
@@ -1685,7 +1858,7 @@ body{
 /* ------ scenario log overlay inside detail ------ */
 /* digital team panel */
 .team-panel{
-  position:absolute;left:14px;top:14px;width:270px;
+  position:absolute;right:14px;top:14px;width:270px;
   background:rgba(6,10,22,0.88);border:1px solid var(--line);
   display:flex;flex-direction:column;overflow:hidden;
 }
@@ -1719,7 +1892,7 @@ body{
 .team-row .ts.alert{color:var(--rose);border-color:rgba(248,113,113,0.35)}
 
 .scene-log{
-  position:absolute;left:14px;width:270px;max-height:400px;
+  position:absolute;right:14px;width:270px;max-height:400px;
   background:rgba(6,10,22,0.85);border:1px solid var(--line);overflow:hidden;display:flex;flex-direction:column;
 }
 .scene-log h4{padding:8px 12px;border-bottom:1px solid var(--line);font-family:var(--font-display);font-size:10.5px;
@@ -1741,7 +1914,7 @@ body{
 
 /* tiny token strip */
 .token-strip{
-  position:absolute;right:14px;top:14px;width:220px;background:rgba(6,10,22,0.85);border:1px solid var(--line);padding:10px 12px;
+  position:absolute;left:14px;top:14px;width:220px;background:rgba(6,10,22,0.85);border:1px solid var(--line);padding:10px 12px;
 }
 .token-strip h4{font-family:var(--font-display);font-size:10.5px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-dim);font-weight:600;margin-bottom:8px}
 .token-strip .big{font-family:var(--font-display);font-size:22px;color:#fff;font-weight:600}

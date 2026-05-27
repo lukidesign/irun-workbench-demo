@@ -1,7 +1,7 @@
 // iRun Workbench — App root
 const { useState: _aUseState, useEffect: _aUseEffect, useCallback: _aUseCallback } = React;
 const useState = _aUseState, useEffect = _aUseEffect, useCallback = _aUseCallback;
-const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, LangCtx } = window.IRUN_UI;
+const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, PlantAgentField, DispatchedRobots, LangCtx } = window.IRUN_UI;
 const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
 const { PlantDetail, PlantInlineDock, useScenarioStepping } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
@@ -72,6 +72,20 @@ function App(){
   const [scenarioEvents, setScenarioEvents] = useState([]);
   const [showPlantModal, setShowPlantModal] = useState(false);
   const [droneFlying, setDroneFlying] = useState(false);
+  // Command-mode dispatched robots: each = single walker spawned by Dispatch send
+  const [dispatchedRobots, setDispatchedRobots] = useState([]);
+  const onDispatchCommand = useCallback((agentId, text) => {
+    const id = `dr-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+    setDispatchedRobots(prev => [...prev, { id, agentId, text }]);
+  }, []);
+  const onRobotDone = useCallback((id) => {
+    setDispatchedRobots(prev => prev.filter(r => r.id !== id));
+  }, []);
+  // Clear robots + busyMap on mode switch / plant leave
+  useEffect(()=>{
+    if (mode === 'command') { setBusyMap({}); setScenarioEvents([]); }
+    if (mode !== 'command') setDispatchedRobots([]);
+  },[mode]);
 
   // Fit-to-viewport scaling
   useEffect(()=>{
@@ -116,6 +130,7 @@ function App(){
   }, [focusPlant?.id, focusPlant?.short]);
 
   // Reset scenario state when leaving plant (also drop back to map2 if we were in img2)
+  // When entering a new plant, honor its defaultScenarioIdx (e.g. Selangor → B)
   useEffect(()=>{
     if (!focusPlant) {
       setBusyMap({});
@@ -123,6 +138,9 @@ function App(){
       setScenarioIdx(0);
       setShowPlantModal(false);
       if (viewMode === 'img2') setViewMode('map2');
+    } else {
+      const def = typeof focusPlant.defaultScenarioIdx === 'number' ? focusPlant.defaultScenarioIdx : 0;
+      setScenarioIdx(def);
     }
   }, [focusPlant?.id]);
 
@@ -229,7 +247,7 @@ function App(){
         <div className={`right-rail ${dispatchCollapsed?'collapsed':''}`}>
           {dispatchCollapsed
             ? <DispatchTab onExpand={()=>toggleDispatch(false)}/>
-            : <DispatchPanel focusPlant={focusPlant} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)}/>
+            : <DispatchPanel focusPlant={focusPlant} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)} mode={mode} onDispatchCommand={onDispatchCommand}/>
           }
         </div>
       </div>
@@ -249,8 +267,17 @@ function App(){
       {/* drone fly overlay */}
       {droneFlying && <DroneFlight onDone={()=>setDroneFlying(false)}/>}
 
-      {/* walking robot in img2 plant view */}
-      {viewMode === 'img2' && focusPlant && <PlantRobot/>}
+      {/* img2 plant view:
+            - command mode → clear field, render any dispatched walking robots
+            - auto mode + robotField → multi-agent robot field
+            - else → single walking robot */}
+      {viewMode === 'img2' && focusPlant && (
+        mode === 'command'
+          ? <DispatchedRobots robots={dispatchedRobots} onRobotDone={onRobotDone}/>
+          : focusPlant.robotField
+            ? <PlantAgentField plant={focusPlant} busyMap={busyMap} cur={cur}/>
+            : <PlantRobot/>
+      )}
 
 
       {/* dock — img2+focusPlant shows inline plant dashboard, else agent token panel */}

@@ -101,8 +101,26 @@ const PLANTS = [
     capacity: 42.0, power: 26.1, gen: 184.5, alerts: 5, risk: 'high', status: '指挥模式', enStatus: 'Command Mode',
     x: 84, y: 54, mapX: '82%', mapY: '52%', agents: ['ops','warn','alert','diag','order','sched'] },
   { id: 'p6', name: 'ILP · Selangor', enName: 'ILP · Selangor',    short: 'Selangor',  tenant: 'ilp', region: 'Malaysia·吉隆坡', enRegion: 'Malaysia · Kuala Lumpur', city: '吉隆坡', enCity: 'Kuala Lumpur',
-    capacity: 36.5, power: 22.4, gen: 158.2, alerts: 4, risk: 'mid',  status: '托管中',   enStatus: 'Managed',
-    x: 64, y: 74, mapX: '41%', mapY: '68%', agents: ['ops','warn','alert','diag','order','sched','query'] },
+    capacity: 36.5, power: 23.6, gen: 162.4, alerts: 1, risk: 'low',  status: '托管中',   enStatus: 'Managed',
+    x: 64, y: 74, mapX: '41%', mapY: '68%',
+    agents: ['ops','warn','safe','alert','diag','order','sched','pv','insp','query'],
+    // Default to Scenario B (UAV inspection — vision-driven) for this plant
+    defaultScenarioIdx: 1,
+    // Multi-robot field — same logical layout as Hanoi-N (PV array + ops on top, field below)
+    robotField: [
+      { agent:'insp',  x:53, y:44 },  // 巡检 — 阵列中央（B 场景主角）
+      { agent:'drone', x:65, y:33 },  // 无人机起降点
+      { agent:'diag',  x:46, y:51 },  // 诊断 — 阵列中部靠左
+      { agent:'alert', x:36, y:56 },  // 告警 — 阵列左侧中段
+      { agent:'warn',  x:30, y:48 },  // 预警 — 左边缘中段
+      { agent:'order', x:38, y:24 },  // 工单 — 阵列上部偏左
+      { agent:'sched', x:50, y:18 },  // 排程 — 阵列顶部中央
+      { agent:'safe',  x:43, y:58 },  // 安全 — 阵列下通道
+      { agent:'pv',    x:57, y:57 },  // 光伏助手 — 阵列下部
+      { agent:'query', x:60, y:22 },  // 问数 — 阵列上部中右
+      { agent:'ops',   x:70, y:28 },  // 运营 — 阵列上部右侧
+    ],
+  },
   { id: 'p8', name: 'ILP · 巴厘南站',  enName: 'ILP · Bali-South',   short: 'Bali-S',    tenant: 'ilp', region: 'Indonesia·巴厘', enRegion: 'Indonesia · Bali',    city: '巴厘',     enCity: 'Bali',
     capacity: 48.0, power: 30.2, gen: 195.0, alerts: 2, risk: 'low',  status: '托管中',   enStatus: 'Managed',
     x: 86, y: 36, mapX: '75%', mapY: '53%', agents: ['ops','warn','alert','diag','order','sched','query'] },
@@ -114,7 +132,25 @@ const PLANTS = [
     x: 55, y: 32, mapX: '27%', mapY: '55%', agents: ['ops','warn','alert','diag','order','sched','query'] },
   { id: 'p11', name: 'ILP · 河内北站', enName: 'ILP · Hanoi-North',  short: 'Hanoi-N',   tenant: 'ilp', region: 'Vietnam·河内',   enRegion: 'Vietnam · Hanoi',      city: '河内',     enCity: 'Hanoi',
     capacity: 28.0, power: 17.2, gen: 115.0, alerts: 0, risk: 'low',  status: '托管中',   enStatus: 'Managed',
-    x: 48, y: 72, mapX: '12%', mapY: '40%', agents: ['ops','warn','alert','diag','order','sched','query'] },
+    x: 48, y: 72, mapX: '12%', mapY: '40%',
+    agents: ['ops','warn','safe','alert','diag','order','sched','pv','insp','query'],
+    // Multi-robot field — each = one agent positioned on the img2 (plant007.png) layout.
+    // x/y are % of img2 viewport. Positions roughly match red-circle hints on the
+    // solar arrays + buildings; tweak after visual review on real bg.
+    robotField: [
+      { agent:'insp',  x:53, y:44 },  // 巡检 — 阵列中央
+      { agent:'drone', x:65, y:33 },  // 无人机起降点（右侧建筑屋顶）
+      { agent:'diag',  x:46, y:51 },  // 诊断 — 阵列中部靠左
+      { agent:'alert', x:36, y:56 },  // 告警 — 阵列左侧中段
+      { agent:'warn',  x:30, y:48 },  // 预警 — 左边缘中段
+      { agent:'order', x:38, y:24 },  // 工单 — 阵列上部偏左
+      { agent:'sched', x:50, y:18 },  // 排程 — 阵列顶部中央
+      { agent:'safe',  x:43, y:58 },  // 安全 — 阵列下通道（围墙内）
+      { agent:'pv',    x:57, y:57 },  // 光伏助手 — 阵列下部
+      { agent:'query', x:60, y:22 },  // 问数 — 阵列上部中右
+      { agent:'ops',   x:70, y:28 },  // 运营 — 阵列上部右侧
+    ],
+  },
 
   // ── Tenant: fux (河源·福曦能源) · 5 plants ───────────────────────────────
   { id: 'p1', name: '福曦·东源一号',  enName: 'Fux · Dongyuan #01', short: '东源 #01', tenant: 'fux', region: '广东·河源',      enRegion: 'Guangdong · Heyuan',   city: '河源',     enCity: 'Heyuan',
