@@ -471,6 +471,163 @@ const _SESSIONS_SEED = [
     ]},
 ];
 
+// ── Dispatch chat helpers (PV Expo Q&A + streaming) ───────────────────
+function parseAgentFromText(text) {
+  const m = String(text || '').match(/^@(\S+)/);
+  if (!m) return null;
+  const token = m[1];
+  return _AGENTS.find(a => a.short === token || a.en === token) || null;
+}
+
+function stripAgentPrefix(text) {
+  return String(text || '').replace(/^@\S+\s*/, '').trim();
+}
+
+function normQaText(s) {
+  return String(s).trim().toLowerCase();
+}
+
+function findExpoQAFuzzy(list, cleanText) {
+  const c = normQaText(cleanText);
+  if (!c) return null;
+
+  const exact = list.find(x => normQaText(x.qZh) === c || normQaText(x.qEn) === c);
+  if (exact) return exact;
+
+  const contains = list.filter(x =>
+    normQaText(x.qZh).includes(c) || normQaText(x.qEn).includes(c) ||
+    c.split(/\s+/).filter(Boolean).every(tok =>
+      normQaText(x.qZh).includes(tok) || normQaText(x.qEn).includes(tok)
+    )
+  );
+  if (contains.length === 1) return contains[0];
+
+  const byKey = list.filter(x =>
+    (x.matchKeys || []).some(k => c.includes(normQaText(k))) ||
+    normQaText(x.qZh).includes(c) || normQaText(x.qEn).includes(c)
+  );
+  if (byKey.length === 1) return byKey[0];
+  return null;
+}
+
+function findQueryQA(cleanText) {
+  return findExpoQAFuzzy(window.IRUN?.PV_EXPO_QUERY_QA || [], cleanText);
+}
+
+function findOpsQA(cleanText) {
+  return findExpoQAFuzzy(window.IRUN?.PV_EXPO_OPS_QA || [], cleanText);
+}
+
+function findSafeQA(cleanText) {
+  return findExpoQAFuzzy(window.IRUN?.PV_EXPO_SAFE_QA || [], cleanText);
+}
+
+function findDiagQA(cleanText) {
+  return findExpoQAFuzzy(window.IRUN?.PV_EXPO_DIAG_QA || [], cleanText);
+}
+
+function findInspQA(cleanText) {
+  return findExpoQAFuzzy(window.IRUN?.PV_EXPO_INSP_QA || [], cleanText);
+}
+
+function findWarnQA(cleanText) {
+  return findExpoQAFuzzy(window.IRUN?.PV_EXPO_WARN_QA || [], cleanText);
+}
+
+function findSchedQA(cleanText) {
+  return findExpoQAFuzzy(window.IRUN?.PV_EXPO_SCHED_QA || [], cleanText);
+}
+
+function findOrderQA(cleanText) {
+  return findExpoQAFuzzy(window.IRUN?.PV_EXPO_ORDER_QA || [], cleanText);
+}
+
+function findAlertQA(cleanText) {
+  return findExpoQAFuzzy(window.IRUN?.PV_EXPO_ALERT_QA || [], cleanText);
+}
+
+function getExpoQAList(agentId) {
+  if (agentId === 'query') return window.IRUN?.PV_EXPO_QUERY_QA || [];
+  if (agentId === 'ops') return window.IRUN?.PV_EXPO_OPS_QA || [];
+  if (agentId === 'safe') return window.IRUN?.PV_EXPO_SAFE_QA || [];
+  if (agentId === 'diag') return window.IRUN?.PV_EXPO_DIAG_QA || [];
+  if (agentId === 'insp') return window.IRUN?.PV_EXPO_INSP_QA || [];
+  if (agentId === 'warn') return window.IRUN?.PV_EXPO_WARN_QA || [];
+  if (agentId === 'sched') return window.IRUN?.PV_EXPO_SCHED_QA || [];
+  if (agentId === 'order') return window.IRUN?.PV_EXPO_ORDER_QA || [];
+  if (agentId === 'alert') return window.IRUN?.PV_EXPO_ALERT_QA || [];
+  return [];
+}
+
+function findExpoQA(agentId, cleanText) {
+  const c = normQaText(cleanText);
+  if (!c) return null;
+  if (agentId === 'query') return findQueryQA(cleanText);
+  if (agentId === 'ops') return findOpsQA(cleanText);
+  if (agentId === 'safe') return findSafeQA(cleanText);
+  if (agentId === 'diag') return findDiagQA(cleanText);
+  if (agentId === 'insp') return findInspQA(cleanText);
+  if (agentId === 'warn') return findWarnQA(cleanText);
+  if (agentId === 'sched') return findSchedQA(cleanText);
+  if (agentId === 'order') return findOrderQA(cleanText);
+  if (agentId === 'alert') return findAlertQA(cleanText);
+  const key = agentId === 'pv' ? 'PV_EXPO_QA'
+    : null;
+  if (!key) return null;
+  const list = window.IRUN?.[key] || [];
+  return list.find(x => normQaText(x.qZh) === c || normQaText(x.qEn) === c) || null;
+}
+
+function pickExpoAnswer(hit, cleanText, zh) {
+  if (!hit) return '';
+  if (normQaText(hit.qEn) === normQaText(cleanText)) return hit.aEn;
+  if (normQaText(hit.qZh) === normQaText(cleanText)) return hit.aZh;
+  return zh ? hit.aZh : hit.aEn;
+}
+
+function parseStreamSegments(md) {
+  const lines = String(md ?? '').split('\n');
+  const segments = [];
+  let buf = [];
+  const flush = () => {
+    if (buf.length) {
+      segments.push({ type: 'text', text: buf.join('\n') });
+      buf = [];
+    }
+  };
+  for (const line of lines) {
+    const pauseM = line.trim().match(/^pause\s*[:：]\s*(\d+(?:\.\d+)?)\s*s\s*$/i);
+    if (pauseM) {
+      flush();
+      segments.push({ type: 'pause', ms: parseFloat(pauseM[1]) * 1000 });
+    } else {
+      buf.push(line);
+    }
+  }
+  flush();
+  return segments;
+}
+
+function resolveAgentReply(text, agentId, plant, zh) {
+  const cleanText = stripAgentPrefix(text);
+  const hit = findExpoQA(agentId, cleanText);
+  if (hit) {
+    return {
+      stream: true,
+      text: pickExpoAnswer(hit, cleanText, zh),
+    };
+  }
+  if (agentId === 'query' || agentId === 'ops' || agentId === 'safe' || agentId === 'diag' || agentId === 'insp' || agentId === 'warn' || agentId === 'sched' || agentId === 'order' || agentId === 'alert') {
+    return {
+      stream: false,
+      text: zh
+        ? '请从下方推荐问题中选择，或输入完整问题。'
+        : 'Please pick a suggested question below, or type the full question.',
+    };
+  }
+  return { stream: false, text: respondTo(text, agentId, plant) };
+}
+
 function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAgent, onOpenAgent, onCollapse, mode, onDispatchCommand}){
   const [sessions, setSessions] = useState(_SESSIONS_SEED);
   const [currentId, setCurrentId] = useState('s_cur');
@@ -482,7 +639,59 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   const bodyRef = useRef(null);
   const inputRef = useRef(null);
   const renameInputRef = useRef(null);
+  const streamAbortRef = useRef(null);
   const l = useLang(); const zh = l !== 'en';
+
+  useEffect(() => () => { streamAbortRef.current?.abort?.(); }, []);
+
+  function startStreamReply(sessionId, msgIndex, fullText) {
+    streamAbortRef.current?.abort?.();
+    const ac = new AbortController();
+    streamAbortRef.current = ac;
+    const { signal } = ac;
+    const CHAR_DELAY = 16;
+    const CHUNK = 3;
+
+    (async () => {
+      const segments = parseStreamSegments(fullText);
+      let accumulated = '';
+
+      const update = (text, streaming) => {
+        setSessions(prev => prev.map(s => {
+          if (s.id !== sessionId) return s;
+          const msgs = s.msgs.map((m, i) =>
+            i === msgIndex ? { ...m, text, streaming } : m
+          );
+          return { ...s, msgs };
+        }));
+      };
+
+      const sleep = ms => new Promise((res, rej) => {
+        const t = setTimeout(res, ms);
+        signal.addEventListener('abort', () => { clearTimeout(t); rej(new Error('abort')); }, { once: true });
+      });
+
+      try {
+        for (const seg of segments) {
+          if (signal.aborted) return;
+          if (seg.type === 'pause') {
+            await sleep(seg.ms);
+            continue;
+          }
+          const chars = [...seg.text];
+          for (let i = 0; i < chars.length; i += CHUNK) {
+            if (signal.aborted) return;
+            accumulated += chars.slice(i, i + CHUNK).join('');
+            update(accumulated, true);
+            await sleep(CHAR_DELAY);
+          }
+        }
+        if (!signal.aborted) update(accumulated, false);
+      } catch (e) {
+        if (!signal.aborted) update(accumulated, false);
+      }
+    })();
+  }
 
   function startRename(s, e){
     e?.stopPropagation();
@@ -510,6 +719,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   }
   function deleteSession(id, e){
     e?.stopPropagation();
+    if (currentId === id) streamAbortRef.current?.abort?.();
     setSessions(prev => {
       const next = prev.filter(s => s.id !== id);
       // ensure there's always at least one session
@@ -541,6 +751,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   });
 
   function selectSession(id){
+    streamAbortRef.current?.abort?.();
     setCurrentId(id);
     setHistoryOpen(false);
     setInput('');
@@ -548,6 +759,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   }
 
   function newSession(){
+    streamAbortRef.current?.abort?.();
     const id = 's_' + Date.now();
     const now = new Date();
     const p = n => String(n).padStart(2,'0');
@@ -596,32 +808,74 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
     setTimeout(()=>{ inputRef.current?.focus(); }, 0);
   }, [dispatchPlantCtx?.id, dispatchPlantCtx?.name]);
 
-  const send = (text, agentId) => {
-    if(!text.trim()) return;
-    const targetId = agentId || selectedAgent || 'ops';
+  const send = (text, agentIdOverride) => {
+    if (!text.trim()) return;
+    const parsed = parseAgentFromText(text);
+    const targetId = agentIdOverride || parsed?.id || selectedAgent;
+    if (!targetId) return;
+
     // In command mode → dispatch a walking robot with the cleaned command text
     if (mode === 'command' && onDispatchCommand){
-      const cleanText = text.replace(/^@\S+\s*/, '').trim();
+      const cleanText = stripAgentPrefix(text);
       onDispatchCommand(targetId, cleanText || text);
     }
+
+    const reply = resolveAgentReply(text, targetId, focusPlant, zh);
     const userMsg = { role:'user', text };
-    const agentMsg = { role:'agent', agent: targetId, text: respondTo(text, targetId, focusPlant) };
+    const agentMsg = reply.stream
+      ? { role:'agent', agent: targetId, text: '', streaming: true }
+      : { role:'agent', agent: targetId, text: reply.text };
+
+    const sid = currentId;
     setSessions(prev => prev.map(s => {
-      if (s.id !== currentId) return s;
+      if (s.id !== sid) return s;
       const newMsgs = [...s.msgs, userMsg, agentMsg];
-      // Auto-update title from first user message
       const isFirstUser = !s.msgs.some(m => m.role === 'user');
-      const cleanText = text.replace(/^@\S+\s*/, '').trim();
+      const cleanText = stripAgentPrefix(text);
       const newTitle = isFirstUser && cleanText
         ? cleanText.slice(0, 18) + (cleanText.length>18?'…':'')
         : s.title;
+      if (reply.stream) {
+        const msgIdx = newMsgs.length - 1;
+        setTimeout(() => startStreamReply(sid, msgIdx, reply.text), 0);
+      }
       return { ...s, msgs: newMsgs, title: newTitle, agent: targetId };
     }));
     setInput('');
     onSelectAgent?.(null);
   };
 
-  const targetAgent = selectedAgent && _ABI[selectedAgent];
+  const parsedInputAgent = parseAgentFromText(input);
+  const cleanInput = stripAgentPrefix(input);
+  const queryHit = parsedInputAgent?.id === 'query' ? findQueryQA(cleanInput) : null;
+  const opsHit = parsedInputAgent?.id === 'ops' ? findOpsQA(cleanInput) : null;
+  const safeHit = parsedInputAgent?.id === 'safe' ? findSafeQA(cleanInput) : null;
+  const diagHit = parsedInputAgent?.id === 'diag' ? findDiagQA(cleanInput) : null;
+  const inspHit = parsedInputAgent?.id === 'insp' ? findInspQA(cleanInput) : null;
+  const warnHit = parsedInputAgent?.id === 'warn' ? findWarnQA(cleanInput) : null;
+  const schedHit = parsedInputAgent?.id === 'sched' ? findSchedQA(cleanInput) : null;
+  const orderHit = parsedInputAgent?.id === 'order' ? findOrderQA(cleanInput) : null;
+  const alertHit = parsedInputAgent?.id === 'alert' ? findAlertQA(cleanInput) : null;
+  const expoHit = parsedInputAgent && ['pv'].includes(parsedInputAgent.id)
+    ? findExpoQA(parsedInputAgent.id, cleanInput)
+    : null;
+  const canSend = !!parsedInputAgent && cleanInput.length > 0 && (
+    parsedInputAgent.id === 'query' ? !!queryHit
+    : parsedInputAgent.id === 'ops' ? !!opsHit
+    : parsedInputAgent.id === 'safe' ? !!safeHit
+    : parsedInputAgent.id === 'diag' ? !!diagHit
+    : parsedInputAgent.id === 'insp' ? !!inspHit
+    : parsedInputAgent.id === 'warn' ? !!warnHit
+    : parsedInputAgent.id === 'sched' ? !!schedHit
+    : parsedInputAgent.id === 'order' ? !!orderHit
+    : parsedInputAgent.id === 'alert' ? !!alertHit
+    : ['pv'].includes(parsedInputAgent.id) ? !!expoHit
+    : true
+  );
+
+  const targetAgent = (parsedInputAgent || (selectedAgent && _ABI[selectedAgent])) || null;
+  const chipAgentId = parsedInputAgent?.id || selectedAgent || null;
+  const plantFilter = chipAgentId && cleanInput ? cleanInput : '';
 
   return (
     <div className="panel dispatch corners"><span className="c1"/>
@@ -739,7 +993,12 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
               </div>
               <div className="b">
                 <div className="name">{m.role==='user' ? '指挥官' : ag?.name}</div>
-                {m.role === 'agent' ? <Markdown text={m.text} /> : <div>{m.text}</div>}
+                {m.role === 'agent' ? (
+                  <>
+                    <Markdown text={m.text} />
+                    {m.streaming && <span className="stream-cursor">▍</span>}
+                  </>
+                ) : <div>{m.text}</div>}
               </div>
             </div>
           );
@@ -748,15 +1007,24 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
 
       <div className="quick">
         {(() => {
-          const list = selectedAgent ? _QP.filter(x => x.a === selectedAgent) : _QP;
+          const qaList = chipAgentId ? getExpoQAList(chipAgentId) : [];
+          let list = chipAgentId ? _QP.filter(x => x.a === chipAgentId) : _QP;
+          if (plantFilter && qaList.length) {
+            const pf = plantFilter.toLowerCase();
+            list = list.filter(q => {
+              const qa = qaList.find(x => x.qZh === q.t || x.qEn === (q.en || q.t));
+              const titles = [q.t, q.en, qa?.qZh, qa?.qEn].filter(Boolean);
+              return titles.some(t => t.toLowerCase().includes(pf));
+            });
+          }
           return list.map((q,i)=>{
           const ag = _ABI[q.a];
           const cat = _CATS[ag.cat];
           const qLabel = zh ? q.t : (q.en || q.t);
+          const prefix = `@${zh ? ag.short : ag.en} `;
           return (
             <div key={i} className="q-chip" onClick={()=>{
               onSelectAgent?.(q.a);
-              const prefix = `@${zh ? ag.short : ag.en} `;
               setInput(prefix + qLabel);
               setTimeout(()=>{ inputRef.current?.focus(); }, 0);
             }}>
@@ -779,9 +1047,9 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
             : (zh ? '@智能体 输入指令… 例如：@排程 合并今日工单' : '@agent type command… e.g. @Schedule merge today\'s tickets')}
           value={input}
           onChange={e=>setInput(e.target.value)}
-          onKeyDown={e=>{ if(e.key==='Enter') send(input); }}
+          onKeyDown={e=>{ if(e.key==='Enter' && canSend) send(input); }}
         />
-        <button onClick={()=>send(input)}><T z="发送" e="Send"/></button>
+        <button disabled={!canSend} onClick={()=>send(input)}><T z="发送" e="Send"/></button>
       </div>
 
       {targetAgent && (
@@ -810,12 +1078,46 @@ function respondTo(text, agentId, plant){
       return hit.qEn === cleanText ? hit.aEn : hit.aZh;
     }
   }
-  // PV Expo (2026) fixed dialogues for Data Q&A agent
+  // PV Expo (2026) fixed dialogues (fallback; send() uses resolveAgentReply)
   if (agentId === 'query') {
-    const cleanText = String(text || '').replace(/^@\S+\s*/, '').trim();
-    const list = window.IRUN?.PV_EXPO_QUERY_QA || [];
-    const hit = list.find(x => x && (x.qZh === cleanText || x.qEn === cleanText));
-    if (hit) return hit.qEn === cleanText ? hit.aEn : hit.aZh;
+    const cleanText = stripAgentPrefix(text);
+    const hit = findQueryQA(cleanText);
+    if (hit) return pickExpoAnswer(hit, cleanText, true);
+  }
+  if (agentId === 'ops') {
+    const cleanText = stripAgentPrefix(text);
+    const hit = findOpsQA(cleanText);
+    if (hit) return pickExpoAnswer(hit, cleanText, true);
+  }
+  if (agentId === 'safe') {
+    const cleanText = stripAgentPrefix(text);
+    const hit = findSafeQA(cleanText);
+    if (hit) return pickExpoAnswer(hit, cleanText, true);
+  }
+  if (agentId === 'diag') {
+    const cleanText = stripAgentPrefix(text);
+    const hit = findDiagQA(cleanText);
+    if (hit) return pickExpoAnswer(hit, cleanText, true);
+  }
+  if (agentId === 'insp') {
+    const cleanText = stripAgentPrefix(text);
+    const hit = findInspQA(cleanText);
+    if (hit) return pickExpoAnswer(hit, cleanText, true);
+  }
+  if (agentId === 'warn') {
+    const cleanText = stripAgentPrefix(text);
+    const hit = findWarnQA(cleanText);
+    if (hit) return pickExpoAnswer(hit, cleanText, true);
+  }
+  if (agentId === 'sched') {
+    const cleanText = stripAgentPrefix(text);
+    const hit = findSchedQA(cleanText);
+    if (hit) return pickExpoAnswer(hit, cleanText, true);
+  }
+  if (agentId === 'order') {
+    const cleanText = stripAgentPrefix(text);
+    const hit = findOrderQA(cleanText);
+    if (hit) return pickExpoAnswer(hit, cleanText, true);
   }
   // PV Expo (2026) fixed dialogues for Alarm agent
   if (agentId === 'alert') {

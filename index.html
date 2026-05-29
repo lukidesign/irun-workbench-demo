@@ -659,6 +659,14 @@ body{
   text-transform:uppercase;
 }
 .composer button:hover{background:rgba(34,211,238,0.18)}
+.composer button:disabled{opacity:0.38;cursor:not-allowed;border-color:var(--line);color:var(--text-dim);background:transparent}
+.composer button:disabled:hover{background:transparent}
+
+.stream-cursor{
+  display:inline-block;margin-left:2px;color:var(--cyan);
+  animation:stream-blink 0.9s step-end infinite;
+}
+@keyframes stream-blink{50%{opacity:0}}
 
 /* ------ bottom dock ------ */
 .dock{
