@@ -483,6 +483,60 @@ function stripAgentPrefix(text) {
   return String(text || '').replace(/^@\S+\s*/, '').trim();
 }
 
+function splitAgentCommand(text) {
+  const raw = String(text || '');
+  const m = raw.match(/^(@\S+\s*)(.*)$/);
+  return m ? { prefix: m[1], body: m[2].trim() } : { prefix: '', body: raw.trim() };
+}
+
+function getKnownPlantNames() {
+  const plants = window.IRUN?.PLANTS || [];
+  return plants
+    .flatMap(p => [p?.name, p?.enName, p?.short])
+    .filter(Boolean)
+    .map(x => String(x).trim())
+    .filter(Boolean);
+}
+
+function includesKnownPlantName(text) {
+  const s = String(text || '');
+  return getKnownPlantNames().some(name => s.includes(name));
+}
+
+function isKnownPlantName(text) {
+  const s = String(text || '').trim();
+  return getKnownPlantNames().some(name => s === name);
+}
+
+function composePlantInput(text, plantName) {
+  const name = String(plantName || '').trim();
+  if (!name) return text;
+  const { prefix, body } = splitAgentCommand(text);
+  if (!body) return prefix + name;
+  if (isKnownPlantName(body)) return prefix + name;
+  if (includesKnownPlantName(body)) return text;
+  return prefix + name + body;
+}
+
+function composeQuestionInput(prefix, question, plantName) {
+  const q = String(question || '').trim();
+  const name = String(plantName || '').trim();
+  if (!name || includesKnownPlantName(q)) return prefix + q;
+  return prefix + name + q;
+}
+
+function stripPlantNameFromQuestion(text, plant) {
+  let clean = stripAgentPrefix(text);
+  const names = [plant?.name, plant?.enName, plant?.short]
+    .filter(Boolean)
+    .map(x => String(x).trim())
+    .filter(Boolean);
+  names.forEach(name => {
+    if (clean.startsWith(name)) clean = clean.slice(name.length).trim();
+  });
+  return clean;
+}
+
 function normQaText(s) {
   return String(s).trim().toLowerCase();
 }
@@ -546,19 +600,6 @@ function findAlertQA(cleanText) {
   return findExpoQAFuzzy(window.IRUN?.PV_EXPO_ALERT_QA || [], cleanText);
 }
 
-function getExpoQAList(agentId) {
-  if (agentId === 'query') return window.IRUN?.PV_EXPO_QUERY_QA || [];
-  if (agentId === 'ops') return window.IRUN?.PV_EXPO_OPS_QA || [];
-  if (agentId === 'safe') return window.IRUN?.PV_EXPO_SAFE_QA || [];
-  if (agentId === 'diag') return window.IRUN?.PV_EXPO_DIAG_QA || [];
-  if (agentId === 'insp') return window.IRUN?.PV_EXPO_INSP_QA || [];
-  if (agentId === 'warn') return window.IRUN?.PV_EXPO_WARN_QA || [];
-  if (agentId === 'sched') return window.IRUN?.PV_EXPO_SCHED_QA || [];
-  if (agentId === 'order') return window.IRUN?.PV_EXPO_ORDER_QA || [];
-  if (agentId === 'alert') return window.IRUN?.PV_EXPO_ALERT_QA || [];
-  return [];
-}
-
 function findExpoQA(agentId, cleanText) {
   const c = normQaText(cleanText);
   if (!c) return null;
@@ -609,7 +650,7 @@ function parseStreamSegments(md) {
 }
 
 function resolveAgentReply(text, agentId, plant, zh) {
-  const cleanText = stripAgentPrefix(text);
+  const cleanText = stripPlantNameFromQuestion(text, plant);
   const hit = findExpoQA(agentId, cleanText);
   if (hit) {
     return {
@@ -641,6 +682,8 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   const renameInputRef = useRef(null);
   const streamAbortRef = useRef(null);
   const l = useLang(); const zh = l !== 'en';
+  const plantCtx = dispatchPlantCtx || focusPlant || null;
+  const plantName = plantCtx?.name || '';
 
   useEffect(() => () => { streamAbortRef.current?.abort?.(); }, []);
 
@@ -786,9 +829,9 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
     if (!ag) return;
     const prefix = `@${zh ? ag.short : ag.en} `;
     setInput(prev => {
-      // strip any previous @prefix and replace with the new one
-      const stripped = prev.replace(/^@\S+\s*/, '');
-      return prefix + stripped;
+      const current = splitAgentCommand(prev);
+      if (!current.prefix && isKnownPlantName(current.body)) return prefix + current.body;
+      return prefix;
     });
     setTimeout(()=>{
       if (inputRef.current){
@@ -800,13 +843,12 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   },[selectedAgent]);
 
   // Clicking a plant on the map can push context into dispatch input.
-  // Requirement: set plant name as the input value (you decide how to use it later).
   useEffect(()=>{
     const name = dispatchPlantCtx?.name;
     if (!name) return;
-    setInput(name);
+    setInput(prev => dispatchPlantCtx?.resetInput ? name : composePlantInput(prev, name));
     setTimeout(()=>{ inputRef.current?.focus(); }, 0);
-  }, [dispatchPlantCtx?.id, dispatchPlantCtx?.name]);
+  }, [dispatchPlantCtx?.id, dispatchPlantCtx?.name, dispatchPlantCtx?.resetInput, dispatchPlantCtx?.clickKey]);
 
   const send = (text, agentIdOverride) => {
     if (!text.trim()) return;
@@ -820,7 +862,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
       onDispatchCommand(targetId, cleanText || text);
     }
 
-    const reply = resolveAgentReply(text, targetId, focusPlant, zh);
+    const reply = resolveAgentReply(text, targetId, plantCtx, zh);
     const userMsg = { role:'user', text };
     const agentMsg = reply.stream
       ? { role:'agent', agent: targetId, text: '', streaming: true }
@@ -846,20 +888,20 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   };
 
   const parsedInputAgent = parseAgentFromText(input);
-  const cleanInput = stripAgentPrefix(input);
-  const queryHit = parsedInputAgent?.id === 'query' ? findQueryQA(cleanInput) : null;
-  const opsHit = parsedInputAgent?.id === 'ops' ? findOpsQA(cleanInput) : null;
-  const safeHit = parsedInputAgent?.id === 'safe' ? findSafeQA(cleanInput) : null;
-  const diagHit = parsedInputAgent?.id === 'diag' ? findDiagQA(cleanInput) : null;
-  const inspHit = parsedInputAgent?.id === 'insp' ? findInspQA(cleanInput) : null;
-  const warnHit = parsedInputAgent?.id === 'warn' ? findWarnQA(cleanInput) : null;
-  const schedHit = parsedInputAgent?.id === 'sched' ? findSchedQA(cleanInput) : null;
-  const orderHit = parsedInputAgent?.id === 'order' ? findOrderQA(cleanInput) : null;
-  const alertHit = parsedInputAgent?.id === 'alert' ? findAlertQA(cleanInput) : null;
+  const qaInput = stripPlantNameFromQuestion(input, plantCtx);
+  const queryHit = parsedInputAgent?.id === 'query' ? findQueryQA(qaInput) : null;
+  const opsHit = parsedInputAgent?.id === 'ops' ? findOpsQA(qaInput) : null;
+  const safeHit = parsedInputAgent?.id === 'safe' ? findSafeQA(qaInput) : null;
+  const diagHit = parsedInputAgent?.id === 'diag' ? findDiagQA(qaInput) : null;
+  const inspHit = parsedInputAgent?.id === 'insp' ? findInspQA(qaInput) : null;
+  const warnHit = parsedInputAgent?.id === 'warn' ? findWarnQA(qaInput) : null;
+  const schedHit = parsedInputAgent?.id === 'sched' ? findSchedQA(qaInput) : null;
+  const orderHit = parsedInputAgent?.id === 'order' ? findOrderQA(qaInput) : null;
+  const alertHit = parsedInputAgent?.id === 'alert' ? findAlertQA(qaInput) : null;
   const expoHit = parsedInputAgent && ['pv'].includes(parsedInputAgent.id)
-    ? findExpoQA(parsedInputAgent.id, cleanInput)
+    ? findExpoQA(parsedInputAgent.id, qaInput)
     : null;
-  const canSend = !!parsedInputAgent && cleanInput.length > 0 && (
+  const canSend = !!parsedInputAgent && qaInput.length > 0 && (
     parsedInputAgent.id === 'query' ? !!queryHit
     : parsedInputAgent.id === 'ops' ? !!opsHit
     : parsedInputAgent.id === 'safe' ? !!safeHit
@@ -875,7 +917,6 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
 
   const targetAgent = (parsedInputAgent || (selectedAgent && _ABI[selectedAgent])) || null;
   const chipAgentId = parsedInputAgent?.id || selectedAgent || null;
-  const plantFilter = chipAgentId && cleanInput ? cleanInput : '';
 
   return (
     <div className="panel dispatch corners"><span className="c1"/>
@@ -1007,16 +1048,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
 
       <div className="quick">
         {(() => {
-          const qaList = chipAgentId ? getExpoQAList(chipAgentId) : [];
           let list = chipAgentId ? _QP.filter(x => x.a === chipAgentId) : _QP;
-          if (plantFilter && qaList.length) {
-            const pf = plantFilter.toLowerCase();
-            list = list.filter(q => {
-              const qa = qaList.find(x => x.qZh === q.t || x.qEn === (q.en || q.t));
-              const titles = [q.t, q.en, qa?.qZh, qa?.qEn].filter(Boolean);
-              return titles.some(t => t.toLowerCase().includes(pf));
-            });
-          }
           return list.map((q,i)=>{
           const ag = _ABI[q.a];
           const cat = _CATS[ag.cat];
@@ -1024,8 +1056,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
           const prefix = `@${zh ? ag.short : ag.en} `;
           return (
             <div key={i} className="q-chip" onClick={()=>{
-              onSelectAgent?.(q.a);
-              setInput(prefix + qLabel);
+              setInput(composeQuestionInput(prefix, qLabel, plantName));
               setTimeout(()=>{ inputRef.current?.focus(); }, 0);
             }}>
               <span className="tag" style={{color:cat.color}}>@{zh ? ag.short : ag.en}</span>

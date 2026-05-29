@@ -97,7 +97,7 @@ const PLANTS = [
   // ── Tenant: ILP (International Landing Plants) · 7 plants ───────────────
   { id: '1879736396404850688', name: '', enName: '',    short: 'Banten-A',  tenant: 'ilp', region: 'Indonesia·万丹',  enRegion: 'Indonesia · Banten',   city: '万丹',     enCity: 'Banten',
     capacity: 50.0, power: 0, gen: 218.4, alerts: 3, risk: 'mid',  status: '托管中',   enStatus: 'Managed',
-    x: 78, y: 68, mapX: '64%', mapY: '60%',
+    x: 78, y: 68, mapX: '86%', mapY: '56%',
     agents: ['ops','warn','alert','diag','order','sched','insp','query'],
     defaultScenarioIdx: 1,
     robotField: [
@@ -115,11 +115,11 @@ const PLANTS = [
 
   { id: '1861683646672760832', name: '', enName: '', short: 'Cebu-N',   tenant: 'ilp', region: 'Philippines·宿务', enRegion: 'Philippines · Cebu',   city: '宿务',     enCity: 'Cebu',
     capacity: 42.0, power:0, gen: 184.5, alerts: 5, risk: 'high', status: '指挥模式', enStatus: 'Command Mode',
-    x: 84, y: 54, mapX: '86%', mapY: '56%', agents: ['ops','warn','alert','diag','order','sched'] },
+    x: 84, y: 54, mapX: '33%', mapY: '46%', agents: ['ops','warn','alert','diag','order','sched'] },
 
   { id: '1881233694553112576', name: '', enName: '',    short: 'Selangor',  tenant: 'ilp', region: 'Malaysia·吉隆坡', enRegion: 'Malaysia · Kuala Lumpur', city: '吉隆坡', enCity: 'Kuala Lumpur',
     capacity: 36.5, power: 0, gen: 162.4, alertsPLANTS: 1, risk: 'low',  status: '托管中',   enStatus: 'Managed',
-    x: 64, y: 74, mapX: '31%', mapY: '73%',
+    x: 64, y: 74, mapX: '42%', mapY: '68%',
     agents: ['ops','warn','safe','alert','diag','order','sched','pv','insp','query'],
     // 演示站：固定场景 A（告警驱动 · 自主闭环）
     defaultScenarioIdx: 0,
@@ -145,7 +145,7 @@ const PLANTS = [
 
   { id: '1879736307422691328', name: '', enName: '',  short: 'Penang-W',  tenant: 'ilp', region: 'Malaysia·槟城',  enRegion: 'Malaysia · Penang',    city: '槟城',     enCity: 'Penang',
     capacity: 32.0, power: 0, gen: 138.0, alerts: 3, risk: 'mid',  status: '托管中',   enStatus: 'Managed',
-    x: 55, y: 32, mapX: '29%', mapY: '54%', agents: ['ops','warn','alert','diag','order','sched','query'] },
+    x: 55, y: 32, mapX: '33%', mapY: '74%', agents: ['ops','warn','alert','diag','order','sched','query'] },
 ];
 
 // Compute aggregate KPIs for a subset of plants (used by TopBar per-tenant)

@@ -284,8 +284,18 @@ function App(){
           onFocus={(id, plant)=>{
             // 保存一份点击时的电站上下文，供调度输入框使用（怎么用由你决定）
             const p = plant || plants.find(x => x.id === id);
-            setDispatchPlantCtx(p ? { id: p.id, name: p.name } : { id, name: '' });
+            const resetDispatchInput = dispatchCollapsed && !!selectedAgent;
+            if (resetDispatchInput) setSelectedAgent(null);
+            const clickKey = `${id}:${Date.now()}`;
+            setDispatchPlantCtx(p
+              ? { id: p.id, name: p.name, resetInput: resetDispatchInput, clickKey }
+              : { id, name: '', resetInput: resetDispatchInput, clickKey });
             const hideDispatch = isDispatchHiddenPlant(id);
+            if (!dispatchCollapsed) {
+              setStreamCollapsed(true);
+              try { localStorage.setItem('irun:stream-collapsed', '1'); } catch (e) {}
+              return;
+            }
             if (hideDispatch) toggleDispatch(true);
             else if (dispatchCollapsed) toggleDispatch(false);
             if (hideDispatch) toggleStream(false);
@@ -295,7 +305,6 @@ function App(){
             }
             // dispatch 展开时：只做上面这一步，不改变 focusPlant（TopBar / 详情等保持不变）
             // 隐藏调度电站：仍进入 img2 焦点视图
-            if (!hideDispatch && !dispatchCollapsed) return;
             // dispatch 折叠时：保持原行为（更新焦点并进入 img2）
             setFocusId(id);
             setViewMode('img2');

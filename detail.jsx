@@ -619,7 +619,7 @@ function PIDCardScene({plant, scenario, stepIdx, cur, busyMap, isStandard}){
       if (!unavailableAgentIds.has(r.agent)) posMap[r.agent] = { x: r.x, y: r.y };
     });
     sceneNodes = plant.robotField
-      .filter(r => !r.anchorOnly && !unavailableAgentIds.has(r.agent))
+      .filter(r => !r.anchorOnly && !unavailableAgentIds.has(r.agent) && _D_ABI[r.agent])
       .map(r => ({ id: r.agent, pos: posMap[r.agent] }));
   } else {
     sceneNodes = Object.entries(NODE_POS)
@@ -634,18 +634,43 @@ function PIDCardScene({plant, scenario, stepIdx, cur, busyMap, isStandard}){
       });
   }
 
-  const fromPos = cur && posMap[cur.from];
-  const toPos = cur && posMap[cur.to];
+  const clampPct = (value, min, max) => Math.max(min, Math.min(max, value));
+  const mapRange = (value, min, max, outMin, outMax) => {
+    if (max === min) return (outMin + outMax) / 2;
+    return outMin + ((value - min) / (max - min)) * (outMax - outMin);
+  };
+  const rawPositions = Object.values(posMap);
+  const bounds = rawPositions.reduce((acc, pos) => ({
+    minX: Math.min(acc.minX, pos.x),
+    maxX: Math.max(acc.maxX, pos.x),
+    minY: Math.min(acc.minY, pos.y),
+    maxY: Math.max(acc.maxY, pos.y),
+  }), { minX: 100, maxX: 0, minY: 100, maxY: 0 });
+  const spreadPos = useRobotField
+    ? (pos) => ({
+        x: clampPct(mapRange(pos.x, bounds.minX, bounds.maxX, 14, 86), 10, 90),
+        y: clampPct(mapRange(pos.y, bounds.minY, bounds.maxY, 18, 82), 12, 88),
+      })
+    : (pos) => ({
+        x: clampPct(50 + (pos.x - 50) * 1.18, 7, 93),
+        y: clampPct(50 + (pos.y - 50) * 1.25, 9, 91),
+      });
+  const displayPosMap = {};
+  Object.entries(posMap).forEach(([id, pos]) => { displayPosMap[id] = spreadPos(pos); });
+  const displaySceneNodes = sceneNodes.map(({ id, pos }) => ({ id, pos: displayPosMap[id] || pos }));
+
+  const fromPos = cur && displayPosMap[cur.from];
+  const toPos = cur && displayPosMap[cur.to];
   const lineColor = !cur ? '#22d3ee'
                   : cur.type === 'action' ? '#fbbf24'
                   : cur.tag === '安全' ? '#f87171'
                   : '#22d3ee';
-  const visibleIds = new Set(sceneNodes.map(n => n.id));
+  const visibleIds = new Set(displaySceneNodes.map(n => n.id));
   const speaker = !cur ? null
     : (busyMap?.[cur.to] && visibleIds.has(cur.to)) ? cur.to
     : (busyMap?.[cur.from] && visibleIds.has(cur.from)) ? cur.from
     : null;
-  const speakerPos = speaker ? posMap[speaker] : null;
+  const speakerPos = speaker ? displayPosMap[speaker] : null;
 
   return (
     <div className={`pid-card pid-c-scene pid-no-open${isStandard ? ' pid-card-dimmed' : ''}`}>
@@ -692,7 +717,7 @@ function PIDCardScene({plant, scenario, stepIdx, cur, busyMap, isStandard}){
                  }}/>
           </>
         )}
-        {sceneNodes.map(({ id, pos }) => {
+        {displaySceneNodes.map(({ id, pos }) => {
           const cat = getCat(id);
           const isActive = !!(busyMap && busyMap[id]);
           const ag = _D_ABI[id];

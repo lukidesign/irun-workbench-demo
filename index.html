@@ -678,13 +678,13 @@ body{
 
 /* ------ Plant Inline Dock (img2 + focusPlant) ------ */
 .plant-inline-dock{
-  flex:1;min-width:0;display:flex;gap:8px;height:100%;
+  flex:1;min-width:0;display:flex;gap:10px;height:100%;
 }
 .pid-card{
   background:linear-gradient(180deg, rgba(8,14,28,0.78), rgba(6,10,22,0.85));
   border:1px solid rgba(120,160,220,0.12);
-  padding:9px 12px;
-  display:flex;flex-direction:column;gap:5px;
+  padding:10px 14px;
+  display:flex;flex-direction:column;gap:7px;
   cursor:pointer;position:relative;overflow:hidden;
   transition:border-color .15s, background .15s, transform .15s, box-shadow .15s;
 }
@@ -732,7 +732,7 @@ body{
 .pid-c-kpi{flex:1 1 320px;min-width:280px}
 .pid-c-team{flex:1 1 250px;min-width:220px}
 .pid-c-log{flex:1 1 310px;min-width:260px}
-.pid-c-scene{flex:1 1 290px;min-width:240px}
+.pid-c-scene{flex:1.12 1 320px;min-width:240px}
 .pid-c-token{flex:1 1 240px;min-width:220px}
 
 /* card header */
@@ -833,11 +833,11 @@ body{
 .pid-pv-cell.work{background:rgba(34,211,238,0.22);border-color:var(--cyan)}
 
 /* card 5: scene mini */
-.pid-scene-wrap{flex:1;position:relative;padding-top:3px;min-height:0}
+.pid-scene-wrap{flex:1;position:relative;margin:4px 4px 2px;min-height:0}
 .pid-scene-pv{
-  position:absolute;left:22%;right:22%;top:25%;bottom:25%;
-  display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(8,1fr);gap:1px;
-  border:1px dashed rgba(34,211,238,0.18);padding:2px;
+  position:absolute;left:29%;right:29%;top:32%;bottom:32%;
+  display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(8,1fr);gap:1.5px;
+  border:1px dashed rgba(34,211,238,0.18);padding:3px;
 }
 .pid-scene-cell{background:rgba(34,211,238,0.05);border:1px solid rgba(34,211,238,0.1)}
 .pid-scene-cell.hot{background:rgba(248,113,113,0.22);border-color:rgba(248,113,113,0.45);animation:hot 1.4s ease-in-out infinite}
