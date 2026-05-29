@@ -156,6 +156,8 @@ body{
   border-color:rgba(34,211,238,0.4);
 }
 .agent-tile.off{opacity:0.35}
+.agent-tile.locked{pointer-events:none;cursor:default;filter:grayscale(0.85)}
+.agent-tile.locked:hover{background:transparent}
 .agent-tile .robot-wrap{position:relative;width:42px;height:42px;display:grid;place-items:center}
 .agent-tile .robot-wrap svg{width:42px;height:42px}
 .agent-tile .badge-count{
@@ -702,6 +704,14 @@ body{
   pointer-events:none;
 }
 .pid-card:hover::before,.pid-card:hover::after{border-color:var(--cyan)}
+.pid-card.pid-no-open{cursor:default}
+.pid-card.pid-no-open:hover{
+  border-color:rgba(120,160,220,0.12);
+  background:linear-gradient(180deg, rgba(8,14,28,0.78), rgba(6,10,22,0.85));
+  transform:none;
+  box-shadow:none;
+}
+.pid-card.pid-no-open:hover::before,.pid-card.pid-no-open:hover::after{border-color:rgba(34,211,238,0.5)}
 
 .pid-c-kpi{flex:1 1 320px;min-width:280px}
 .pid-c-team{flex:1 1 250px;min-width:220px}
@@ -1367,6 +1377,9 @@ body{
   cursor:pointer;text-transform:uppercase;
 }
 .mode-tabs button.on{background:rgba(34,211,238,0.1);color:var(--cyan)}
+.mode-tabs.mode-tabs-locked button:disabled,
+.pid-k-mode.pid-k-mode-locked button:disabled{opacity:0.38;cursor:not-allowed;color:var(--text-dim)}
+.pid-tl-lbl-only{color:var(--cyan);letter-spacing:0.06em;font-size:11px}
 .detail-close{
   width:30px;height:30px;border:1px solid var(--line);display:grid;place-items:center;color:var(--text-dim);
   cursor:pointer;font-family:var(--font-display);font-size:14px;
@@ -2012,6 +2025,7 @@ body{
 
 <script src="data.js"></script>
 <script src="fetch.js"></script>
+<script src="tokenData.js"></script>
 <script type="text/babel" src="components.jsx"></script>
 <script type="text/babel" src="map.jsx"></script>
 <script type="text/babel" src="scene3d.jsx"></script>

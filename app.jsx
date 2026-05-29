@@ -6,6 +6,8 @@ const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
 const { PlantDetail, PlantInlineDock, useScenarioStepping } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
 const { PLANTS: APP_PLANTS, TENANTS: APP_TENANTS, AGENTS: APP_AGENTS, AGENT_BY_ID: APP_ABI, aggregateOf: APP_AGG_OF } = window.IRUN;
+const isDispatchHiddenPlant = window.IRUN?.isDispatchHiddenPlant || (() => false);
+const getDemoPlantProfile = (id) => window.IRUN?.getDemoPlantProfile?.(id) || null;
 
 function App(){
   const [plants, setPlants] = useState(() => window.IRUN?.PLANTS || APP_PLANTS || []);
@@ -61,6 +63,11 @@ function App(){
     });
     return n;
   });
+  useEffect(() => {
+    if (theme === 'dark' && selectedAgent && !['ops', 'warn', 'safe'].includes(selectedAgent)) {
+      setSelectedAgent(null);
+    }
+  }, [theme, selectedAgent]);
   const toggleLang = () => setLang(l => {
     const n = l==='zh'?'en':'zh';
     try{ localStorage.setItem('irun:lang', n); }catch(e){}
@@ -71,8 +78,6 @@ function App(){
   const [scenarioIdx, setScenarioIdx] = useState(0);
   const [mode, setMode] = useState('auto');
   const [busyMap, setBusyMap] = useState({});
-  const [scenarioEvents, setScenarioEvents] = useState([]);
-  const [showPlantModal, setShowPlantModal] = useState(false);
   const [droneFlying, setDroneFlying] = useState(false);
   // Command-mode dispatched robots: each = single walker spawned by Dispatch send
   const [dispatchedRobots, setDispatchedRobots] = useState([]);
@@ -85,7 +90,7 @@ function App(){
   }, []);
   // Clear robots + busyMap on mode switch / plant leave
   useEffect(()=>{
-    if (mode === 'command') { setBusyMap({}); setScenarioEvents([]); }
+    if (mode === 'command') { setBusyMap({}); }
     if (mode !== 'command') setDispatchedRobots([]);
   },[mode]);
 
@@ -147,37 +152,57 @@ function App(){
 
   // When scenario step fires, mark from/to as busy and emit an event into the global stream
   const onStep = useCallback((step, idx, scenario) => {
+    if (!step) return;
     const m = {};
     if (APP_ABI[step.from]) m[step.from] = true;
     if (APP_ABI[step.to])   m[step.to]   = true;
     setBusyMap(m);
-    // emit to global stream
-    if (APP_ABI[step.from] || APP_ABI[step.to]) {
-      const agent = APP_ABI[step.from] ? step.from : step.to;
-      setScenarioEvents(prev => [...prev.slice(-20), {
-        id: `sc-${scenario.id}-${idx}-${Date.now()}`,
-        t: Date.now(),
-        agent,
-        text: `${focusPlant?.short || ''} · ${step.text}`,
-        sev: step.type==='action' ? 'mid' : (step.tag==='安全'?'high':'low'),
-        plantId: focusPlant?.id,
-      }]);
-    }
-  }, [focusPlant?.id, focusPlant?.short]);
+  }, []);
 
   // Reset scenario state when leaving plant (also drop back to map2 if we were in img2)
-  // When entering a new plant, honor its defaultScenarioIdx (e.g. Selangor → B)
+  // When entering a new plant, honor its defaultScenarioIdx（演示站固定场景 A）
   useEffect(()=>{
     if (!focusPlant) {
       setBusyMap({});
       setMode('auto');
       setScenarioIdx(0);
-      setShowPlantModal(false);
       if (viewMode === 'img2') setViewMode('map2');
     } else {
-      const def = typeof focusPlant.defaultScenarioIdx === 'number' ? focusPlant.defaultScenarioIdx : 0;
-      setScenarioIdx(def);
+      const demo = getDemoPlantProfile(focusPlant.id);
+      if (demo) {
+        setMode('auto');
+        setScenarioIdx(demo.scenarioIdx);
+      } else {
+        const def = typeof focusPlant.defaultScenarioIdx === 'number' ? focusPlant.defaultScenarioIdx : 0;
+        setScenarioIdx(def);
+      }
     }
+  }, [focusPlant?.id]);
+
+  // 焦点电站切换：隐藏调度列表内电站默认关闭调度，其余电站默认打开
+  useEffect(() => {
+    if (!focusId) return;
+    if (isDispatchHiddenPlant(focusId)) {
+      setDispatchCollapsed(true);
+      try { localStorage.setItem('irun:dispatch-collapsed', '1'); } catch (e) {}
+      setStreamCollapsed(false);
+      try { localStorage.setItem('irun:stream-collapsed', '0'); } catch (e) {}
+    } else {
+      setDispatchCollapsed(false);
+      try { localStorage.setItem('irun:dispatch-collapsed', '0'); } catch (e) {}
+    }
+  }, [focusId]);
+
+  const hideDispatchRail = isDispatchHiddenPlant(focusPlant?.id);
+
+  const handleModeChange = useCallback((next) => {
+    if (getDemoPlantProfile(focusPlant?.id) && next === 'command') return;
+    setMode(next);
+  }, [focusPlant?.id]);
+
+  const handleScenarioChange = useCallback((idx) => {
+    if (getDemoPlantProfile(focusPlant?.id)) return;
+    setScenarioIdx(idx);
   }, [focusPlant?.id]);
 
   // Centralised scenario stepping — drives both PlantInlineDock and PlantDetail popup
@@ -186,7 +211,7 @@ function App(){
     plantId: focusPlant?.id,
     mode,
     onStep,
-    onScenarioChange: setScenarioIdx,
+    onScenarioChange: handleScenarioChange,
   });
 
   // ESC to close
@@ -194,13 +219,12 @@ function App(){
     const onKey = e => {
       if(e.key==='Escape'){
         if(openAgent) setOpenAgent(null);
-        else if(showPlantModal) setShowPlantModal(false);
         else if(focusId) setFocusId(null);
       }
     };
     window.addEventListener('keydown', onKey);
     return ()=>window.removeEventListener('keydown', onKey);
-  },[openAgent, focusId, showPlantModal]);
+  },[openAgent, focusId]);
 
   const totalTokens = APP_AGENTS.reduce((s,a)=>s + parseFloat(a.metrics.tokens)*1000, 0);
   const busyCount = Object.values(busyMap).filter(Boolean).length || 3;
@@ -254,8 +278,13 @@ function App(){
             // 保存一份点击时的电站上下文，供调度输入框使用（怎么用由你决定）
             const p = plant || plants.find(x => x.id === id);
             setDispatchPlantCtx(p ? { id: p.id, name: p.name } : { id, name: '' });
+            const hideDispatch = isDispatchHiddenPlant(id);
+            if (hideDispatch) toggleDispatch(true);
+            else if (dispatchCollapsed) toggleDispatch(false);
+            if (hideDispatch) toggleStream(false);
             // dispatch 展开时：只做上面这一步，不改变 focusPlant（TopBar / 详情等保持不变）
-            if (!dispatchCollapsed) return;
+            // 隐藏调度电站：仍进入 img2 焦点视图
+            if (!hideDispatch && !dispatchCollapsed) return;
             // dispatch 折叠时：保持原行为（更新焦点并进入 img2）
             setFocusId(id);
             setViewMode('img2');
@@ -322,17 +351,19 @@ function App(){
       <div className="stage">
         <div className={`left-rail ${streamCollapsed?'collapsed':''}`}>
           {streamCollapsed
-            ? <EventStreamTab onExpand={()=>toggleStream(false)} count={scenarioEvents.length}/>
-            : <EventStream focusPlant={focusPlant} scenarioEvents={scenarioEvents} onCollapse={()=>toggleStream(true)}/>
+            ? <EventStreamTab onExpand={()=>toggleStream(false)}/>
+            : <EventStream onCollapse={()=>toggleStream(true)}/>
           }
         </div>
         <div className="center-stretch"/>
-        <div className={`right-rail ${dispatchCollapsed?'collapsed':''}`}>
-          {dispatchCollapsed
-            ? <DispatchTab onExpand={()=>toggleDispatch(false)}/>
-            : <DispatchPanel focusPlant={focusPlant} dispatchPlantCtx={dispatchPlantCtx} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)} mode={mode} onDispatchCommand={onDispatchCommand}/>
-          }
-        </div>
+        {!hideDispatchRail && (
+          <div className={`right-rail ${dispatchCollapsed?'collapsed':''}`}>
+            {dispatchCollapsed
+              ? <DispatchTab onExpand={()=>toggleDispatch(false)}/>
+              : <DispatchPanel focusPlant={focusPlant} dispatchPlantCtx={dispatchPlantCtx} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)} mode={mode} onDispatchCommand={onDispatchCommand}/>
+            }
+          </div>
+        )}
       </div>
 
       {/* far-right vertical agents rail */}
@@ -340,7 +371,8 @@ function App(){
         focusPlant={focusPlant}
         busyMap={busyMap}
         selected={selectedAgent}
-        onSelect={(id)=>{ setSelectedAgent(id); if (id && dispatchCollapsed) toggleDispatch(false); }}
+        theme={theme}
+        onSelect={(id)=>{ setSelectedAgent(id); if (id && dispatchCollapsed && !hideDispatchRail) toggleDispatch(false); }}
         onOpen={setOpenAgent}
         onSkillOpen={()=>setOpenSkillMarket(true)}
         onDroneFly={()=>setDroneFlying(true)}
@@ -373,15 +405,13 @@ function App(){
               cur={cur}
               mode={mode}
               scenarioIdx={scenarioIdx}
-              onModeChange={setMode}
-              onScenarioChange={setScenarioIdx}
-              onOpenModal={()=>setShowPlantModal(true)}/>
+              onModeChange={handleModeChange}
+              onScenarioChange={handleScenarioChange}/>
           : <AgentTokenPanel busyMap={busyMap} onOpen={setOpenAgent}/>}
       </div>
 
-      {/* plant detail overlay — popup mode (click any inline card) or auto-open in non-img2 modes
-          NOTE: map2 点选电站用于调度输入上下文时，不自动弹出详情 */}
-      {focusPlant && (((viewMode !== 'img2') && (viewMode !== 'map2')) || showPlantModal) && (
+      {/* plant detail overlay — 非 img2/map2 视图；底部卡片点击不再弹出 */}
+      {focusPlant && (viewMode !== 'img2') && (viewMode !== 'map2') && (
         <PlantDetail
           plant={focusPlant}
           scenario={scenario}
@@ -389,12 +419,9 @@ function App(){
           cur={cur}
           mode={mode}
           scenarioIdx={scenarioIdx}
-          onModeChange={setMode}
-          onScenarioChange={setScenarioIdx}
-          onClose={()=>{
-            if(viewMode === 'img2') setShowPlantModal(false);
-            else setFocusId(null);
-          }}/>
+          onModeChange={handleModeChange}
+          onScenarioChange={handleScenarioChange}
+          onClose={()=>setFocusId(null)}/>
       )}
 
       {/* agent modal */}
@@ -405,7 +432,7 @@ function App(){
           busyMap={busyMap}
           onChat={(id)=>{
             setSelectedAgent(id);
-            if (id && dispatchCollapsed) toggleDispatch(false);
+            if (id && dispatchCollapsed && !isDispatchHiddenPlant(focusPlant?.id)) toggleDispatch(false);
           }}
         />
       )}
