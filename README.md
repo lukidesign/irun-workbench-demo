@@ -2,7 +2,7 @@
 
 仿 runjian PMMS 思路、面向新能源电站的「数字孪生运维指挥中心」演示。10 大智能体作为数字团队协同运维，暗色科技风格。
 
-**当前版本：v0.3.3** · 源需求：`design_pkg/workbench-demo-20260525/project/uploads/iRun Workbench Demo-1f363335.md`
+**当前版本：v0.4.0** · 源需求：`design_pkg/workbench-demo-20260525/project/uploads/iRun Workbench Demo-1f363335.md`
 
 ## 运行
 
@@ -115,6 +115,7 @@ GitHub Pages：Settings → Pages → Source 选 `main` 分支 `/ (root)`，约 
 
 ## 版本历史
 
+- **v0.4.0** — 展会版：真实电站数据接入（fetch.js）· Token 消耗数据 tokenData.js + 构建脚本 · 全局事件流重构为 Penang/Johor 消缺巡检剧本 · 展会助手对话 Markdown
 - **v0.3.3** — PlantAgentField 智能体连线 + 6px 流动光点
 - **v0.3.2** — 修复亮主题总览页 3 巡逻机器人不显示
 - **v0.3.1** — PlantDetail 1/6 + 5/6 分栏，模式切换居中
