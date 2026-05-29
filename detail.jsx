@@ -13,6 +13,13 @@ function getPlantTeamUnavailableIds(plant) {
 const { LangCtx: _D_LANG } = window.IRUN_UI || {};
 const _useD_Lang = () => React.useContext(_D_LANG || React.createContext('zh'));
 
+function stepText(s, zh) { return zh ? s.text : (s.en || s.text); }
+function stepTag(s, zh) { return zh ? s.tag : (s.entag || s.tag); }
+function scenarioTitle(s, zh) { return zh ? s.title : (s.enTitle || s.title); }
+function isSafetyStep(s) { return s?.tag === '安全' || s?.entag === 'Safety'; }
+function agentName(a, zh) { return zh ? a.name : (a.enName || a.name); }
+function agentRole(a, zh) { return zh ? a.role : (a.enRole || a.role); }
+
 // Positions for the 10 agents + plant + field + drone within the scene-stage (% coords)
 const NODE_POS = {
   plant: { x: 50, y: 50, lbl: '电站', en: 'Plant', cat: 'tool' },
@@ -162,13 +169,13 @@ function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx,
         <div className="scenario-timeline">
           <div className="lbl">{demoProfile
             ? (zh ? demoProfile.timelineZh : demoProfile.timelineEn)
-            : scenario.title}</div>
+            : scenarioTitle(scenario, zh)}</div>
           <div className="track"><i style={{width: progress+'%'}}/></div>
           <div className="step-name">
             {cur && (<>
               <span style={{color:'var(--cyan)'}}>step {steps.length ? stepIdx+1 : 0}/{steps.length}</span>
               &nbsp;·&nbsp;
-              {cur.tag}
+              {stepTag(cur, zh)}
             </>)}
           </div>
           {!demoProfile && (
@@ -276,12 +283,12 @@ function SceneStage({plant, scenario, stepIdx, cur, mode}){
       {cur && toPos && (
         <div className="scene-bubble" key={stepIdx}
              style={{left: toPos.x+'%', top: (toPos.y - 5)+'%'}}>
-          <span className="tag">{cur.tag} · {zh
+          <span className="tag">{stepTag(cur, zh)} · {zh
               ? (_D_ABI[cur.from]?.short || _NAME_MAP_CN[cur.from] || cur.from)
               : (_D_ABI[cur.from]?.en    || _NAME_MAP_EN[cur.from] || cur.from)} → {zh
               ? (_D_ABI[cur.to]?.short   || _NAME_MAP_CN[cur.to]   || cur.to)
               : (_D_ABI[cur.to]?.en      || _NAME_MAP_EN[cur.to]   || cur.to)}</span>
-          {cur.text}
+          {stepText(cur, zh)}
         </div>
       )}
 
@@ -324,8 +331,8 @@ function DigitalTeam({plant, activeAgentIds}){
                  style={{'--cat-c': cat.color}}>
               <div className="tc">{ag.code}</div>
               <div className="ti">
-                <div className="tn">{zh ? ag.name : ag.en}</div>
-                <div className="tr">{zh ? ag.role : (ag.enRole || ag.role)}</div>
+                <div className="tn">{agentName(ag, zh)}</div>
+                <div className="tr">{agentRole(ag, zh)}</div>
               </div>
               <div className={`ts ${statusCls}`}>{statusLabel}</div>
             </div>
@@ -365,9 +372,9 @@ function SceneLog({scenario, steps, plant}){
                 <b>{fromName}</b>
                 <span>→</span>
                 <b style={{color: s.type==='handoff'?'#a78bfa':'var(--cyan)'}}>{toName}</b>
-                <span style={{marginLeft:'auto',color:'var(--text-mute)',fontSize:9}}>[{s.tag}]</span>
+                <span style={{marginLeft:'auto',color:'var(--text-mute)',fontSize:9}}>[{stepTag(s, zh)}]</span>
               </div>
-              <div className="tx">{s.text}</div>
+              <div className="tx">{stepText(s, zh)}</div>
             </div>
           );
         })}
@@ -482,7 +489,7 @@ function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress,
             <span className="pid-tl-lbl pid-tl-lbl-only">{zh ? demoProfile.timelineZh : demoProfile.timelineEn}</span>
           </div>
           <div className="pid-tl-track"><i style={{width: progress+'%'}}/></div>
-          <div className="pid-tl-step">step {stepIdx+1}/{scenario.steps.length} · {cur?.tag||''}</div>
+          <div className="pid-tl-step">step {stepIdx+1}/{scenario.steps.length} · {cur ? stepTag(cur, zh) : ''}</div>
         </div>
       )}
     </div>
@@ -541,7 +548,7 @@ function PIDCardTeam({plant, activeAgentIds, forceGrayInsp}){
             <div key={id} className={`pid-team-row${assigned?'':' absent'}`} style={{'--cat-c':cat.color}}>
               <div className="pid-tc">{ag.code}</div>
               <div className="pid-ti">
-                <div className="pid-tn">{zh ? ag.name : ag.en}</div>
+                <div className="pid-tn">{agentName(ag, zh)}</div>
               </div>
               <div className={`pid-ts ${statusCls}`}>{statusLabel}</div>
             </div>
@@ -592,9 +599,9 @@ function PIDCardLog({scenario, steps, isStandard}){
                 <b>{fromName}</b>
                 <span>→</span>
                 <b style={{color: s.type==='handoff'?'#a78bfa':'var(--cyan)'}}>{toName}</b>
-                <span className="tg">[{s.tag}]</span>
+                <span className="tg">[{stepTag(s, zh)}]</span>
               </div>
-              <div className="pid-log-tx">{s.text}</div>
+              <div className="pid-log-tx">{stepText(s, zh)}</div>
             </div>
           );
         })}
@@ -663,7 +670,7 @@ function PIDCardScene({plant, scenario, stepIdx, cur, busyMap, isStandard}){
   const toPos = cur && displayPosMap[cur.to];
   const lineColor = !cur ? '#22d3ee'
                   : cur.type === 'action' ? '#fbbf24'
-                  : cur.tag === '安全' ? '#f87171'
+                  : isSafetyStep(cur) ? '#f87171'
                   : '#22d3ee';
   const visibleIds = new Set(displaySceneNodes.map(n => n.id));
   const speaker = !cur ? null
@@ -735,7 +742,7 @@ function PIDCardScene({plant, scenario, stepIdx, cur, busyMap, isStandard}){
         {cur && speakerPos && (
           <div className="pid-scene-bubble"
                style={{ left: speakerPos.x + '%', top: (speakerPos.y - 6) + '%' }}>
-            {cur.tag}
+            {stepTag(cur, zh)}
           </div>
         )}
       </div>

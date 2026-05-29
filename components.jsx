@@ -6,6 +6,20 @@ const useLang = () => React.useContext(LangCtx);
 // t(zh, en) — picks text based on current lang context
 function T({z, e}){ const l = useLang(); return l==='zh' ? z : e; }
 
+function catLabel(cat, zh) { return zh ? cat.label : (cat.enLabel || cat.label); }
+function agentName(a, zh) { return zh ? a.name : (a.enName || a.name); }
+function agentShort(a, zh) { return zh ? a.short : (a.en || a.short); }
+function agentRole(a, zh) { return zh ? a.role : (a.enRole || a.role); }
+function agentIntro(a, zh) { return zh ? a.intro : (a.enIntro || a.intro); }
+function agentSkill(a, i, zh) {
+  const s = a.skills[i];
+  return zh ? s : (a.enSkills?.[i] || s);
+}
+
+function stepText(s, zh) { return zh ? s.text : (s.en || s.text); }
+function stepTag(s, zh) { return zh ? s.tag : (s.entag || s.tag); }
+function isSafetyStep(s) { return s?.tag === '安全' || s?.entag === 'Safety'; }
+
 const {
   AGENTS: _AGENTS,
   AGENT_BY_ID: _ABI,
@@ -161,7 +175,7 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
         risk: focusPlant.risk === 'high' ? 1 : 0,
         pendingAlerts: Number(focusPlant.pendingAlerts ?? 0),
         noiseReductionRate:focusPlant?.noiseReductionRate? Number(focusPlant.noiseReductionRate ?? 0):0,
-        powerRate: ((Number(focusPlant?.power || 0) / (Number(focusPlant?.installCapacity || 0) || 1)) * 100).toFixed(1),
+        powerRate: ((Number(focusPlant?.power || 0) / (Number(focusPlant?.installCapacity || 0) || 1)) * 100).toFixed(2),
       }
     : (overview
         ? {
@@ -183,7 +197,7 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
           });
   const displayPwr = theme === 'dark' ? 0 : k.pwr;
   const util = theme === 'dark'
-    ? '0'
+    ? '0.00'
     : (k.powerRate ?? ((Number(k.pwr || 0) / (Number(k.cap || 0) || 1)) * 100).toFixed(1));
   const yoy = React.useMemo(() => (Math.random() * 10).toFixed(1), [focusPlant?.id]);
 
@@ -240,16 +254,16 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
         </div>
         <div className="kpi">
           <div className="l">{zh?'装机容量':'Capacity'}</div>
-          <div className="v mono">{k.cap.toFixed(1)}<small>MWp</small></div>
+          <div className="v mono">{k.cap.toFixed(2)}<small>MWp</small></div>
         </div>
         <div className="kpi">
           <div className="l">{zh?'实时功率':'Live Power'}</div>
-          <div className="v mono" style={{whiteSpace:'nowrap'}}>{displayPwr.toFixed(1)}<small>MW · {util}%</small></div>
+          <div className="v mono" style={{whiteSpace:'nowrap'}}>{displayPwr.toFixed(2)}<small>MW · {util}%</small></div>
           <div className="kpi-bar"><i style={{width:util+'%'}}/></div>
         </div>
         <div className="kpi">
           <div className="l">{zh?'今日发电':"Today's Gen"}</div>
-          <div className="v mono">{k.gen.toFixed(1)}<small>MWh</small></div>
+          <div className="v mono">{k.gen.toFixed(2)}<small>MWh</small></div>
           <div className="delta">▲ {yoy}% · {zh?'同比':'YoY'}</div>
         </div>
         <div className="kpi">
@@ -382,92 +396,151 @@ function EventStream({onCollapse}){
 // ──────────────────────────────────────────────────────────────────────
 // Dispatch / chat panel (right)
 
-// Mock chat sessions — full multi-turn conversations
+// Mock chat sessions — full multi-turn conversations (zh + en)
+function sessTitle(s, zh) { return zh ? s.title : (s.enTitle || s.title); }
+function sessTime(s, zh) { return zh ? s.t : (s.enT || s.t); }
+function msgText(m, zh) { return zh ? m.text : (m.enText || m.text); }
+
+const _SESSIONS_SYS_ZH = '已连接 iRun 数字团队 · 10 智能体在线';
+const _SESSIONS_SYS_EN = 'Connected to iRun Digital Team · 10 agents online';
+
 const _SESSIONS_SEED = [
-  { id:'s_cur', t:'当前', dateLabel:'today', agent:'ops', title:'当前会话', isCurrent:true,
+  { id:'s_cur', t:'当前', enT:'Current', dateLabel:'today', agent:'ops', title:'当前会话', enTitle:'Current Session', isCurrent:true,
     msgs:[
-      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-      { role:'agent', agent:'ops', text:'今日 06:00 ~ 现在，3 站托管运行良好。已自主闭环 2 起组串告警，0 起需人工介入。' },
+      { role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN },
+      { role:'agent', agent:'ops',
+        text:'今日 06:00 ~ 现在，3 站托管运行良好。已自主闭环 2 起组串告警，0 起需人工介入。',
+        enText:'From 06:00 today through now, 3 managed sites running well. 2 string alarms closed autonomously, 0 requiring manual intervention.' },
     ]},
-  { id:'s_h1', t:'09:42', dateLabel:'today', agent:'alert', title:'横州渔光 · 组串告警闭环',
+  { id:'s_h1', t:'09:42', enT:'09:42', dateLabel:'today', agent:'alert', title:'横州渔光 · 组串告警闭环', enTitle:'Hengzhou PV · String Alarm Closed',
     msgs:[
-      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-      { role:'user', text:'@告警 横州渔光 C03 组串又跳了，查一下' },
-      { role:'agent', agent:'alert', text:'已聚类去噪：3 条原始告警归并为 1 起组串异常事件 EVT-A203，已派发诊断。' },
-      { role:'agent', agent:'diag', text:'诊断初判：C03-12 组串 IV 偏移 0.42，疑似接线松动；建议派工现场复核。' },
-      { role:'user', text:'@排程 安排明早派单' },
-      { role:'agent', agent:'sched', text:'已排入明日 08:00 优先工单，分配给驻站员小李，预计 30 分钟闭环。' },
-      { role:'user', text:'@工单 看看历史相似工单' },
-      { role:'agent', agent:'order', text:'近 30 天该方阵共 4 起类似工单，3 起为接线松动，1 起为压块腐蚀。' },
+      { role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN },
+      { role:'user', text:'@告警 横州渔光 C03 组串又跳了，查一下', enText:'@Alarm Hengzhou PV C03 string tripped again, check it' },
+      { role:'agent', agent:'alert',
+        text:'已聚类去噪：3 条原始告警归并为 1 起组串异常事件 EVT-A203，已派发诊断。',
+        enText:'Clustered & deduplicated: 3 raw alarms merged into 1 string anomaly event EVT-A203; diagnosis dispatched.' },
+      { role:'agent', agent:'diag',
+        text:'诊断初判：C03-12 组串 IV 偏移 0.42，疑似接线松动；建议派工现场复核。',
+        enText:'Initial diagnosis: C03-12 string IV drift 0.42, suspected loose connection; recommend field verification.' },
+      { role:'user', text:'@排程 安排明早派单', enText:'@Schedule dispatch for tomorrow morning' },
+      { role:'agent', agent:'sched',
+        text:'已排入明日 08:00 优先工单，分配给驻站员小李，预计 30 分钟闭环。',
+        enText:'Scheduled priority ticket for tomorrow 08:00, assigned to on-site tech Li, est. 30 min to close.' },
+      { role:'user', text:'@工单 看看历史相似工单', enText:'@Ticket show similar historical tickets' },
+      { role:'agent', agent:'order',
+        text:'近 30 天该方阵共 4 起类似工单，3 起为接线松动，1 起为压块腐蚀。',
+        enText:'4 similar tickets in this array in the last 30 days: 3 loose connections, 1 clamp corrosion.' },
     ]},
-  { id:'s_h2', t:'08:15', dateLabel:'today', agent:'query', title:'今日 PR 排名速览',
+  { id:'s_h2', t:'08:15', enT:'08:15', dateLabel:'today', agent:'query', title:'今日 PR 排名速览', enTitle:"Today's PR Ranking Snapshot",
     msgs:[
-      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-      { role:'user', text:'@问数 本月各电站 PR 排名？' },
-      { role:'agent', agent:'query', text:'本月 PR 排名 福曦#01 (85.2%) > ILP-Banten (83.9%) > 横州渔光 (82.6%) > 示范站 (81.4%)。' },
+      { role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN },
+      { role:'user', text:'@问数 本月各电站 PR 排名？', enText:'@Data Q&A PR ranking by plant this month?' },
+      { role:'agent', agent:'query',
+        text:'本月 PR 排名 福曦#01 (85.2%) > ILP-Banten (83.9%) > 横州渔光 (82.6%) > 示范站 (81.4%)。',
+        enText:'This month PR ranking: Fuxi #01 (85.2%) > ILP-Banten (83.9%) > Hengzhou PV (82.6%) > Demo Site (81.4%).' },
     ]},
-  { id:'s_h3', t:'昨日 17:30', dateLabel:'earlier', agent:'sched', title:'Banten-A 巡检调度',
+  { id:'s_h3', t:'昨日 17:30', enT:'Yesterday 17:30', dateLabel:'earlier', agent:'sched', title:'Banten-A 巡检调度', enTitle:'Banten-A Inspection Scheduling',
     msgs:[
-      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-      { role:'user', text:'@排程 Banten-A 明天需要做一次组串巡检' },
-      { role:'agent', agent:'sched', text:'已编排 UAV-03 明日 08:30 巡检 · 覆盖 22 个方阵 · 预计 142 分钟。' },
-      { role:'user', text:'@巡检 巡检覆盖率？' },
-      { role:'agent', agent:'insp', text:'本周累计巡检覆盖率 87%，剩余 13% 计划本周末完成。' },
-      { role:'user', text:'@安全 巡检期间是否有作业冲突？' },
-      { role:'agent', agent:'safe', text:'08:30-11:00 时段无登高作业冲突，可安全执行无人机巡检。' },
-      { role:'user', text:'@工单 自动派单' },
-      { role:'agent', agent:'order', text:'已生成工单 W-2625-007，派发驻站员李工，已通知。' },
+      { role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN },
+      { role:'user', text:'@排程 Banten-A 明天需要做一次组串巡检', enText:'@Schedule Banten-A needs a string inspection tomorrow' },
+      { role:'agent', agent:'sched',
+        text:'已编排 UAV-03 明日 08:30 巡检 · 覆盖 22 个方阵 · 预计 142 分钟。',
+        enText:'UAV-03 scheduled tomorrow 08:30 · 22 arrays · est. 142 min.' },
+      { role:'user', text:'@巡检 巡检覆盖率？', enText:'@Inspect inspection coverage?' },
+      { role:'agent', agent:'insp',
+        text:'本周累计巡检覆盖率 87%，剩余 13% 计划本周末完成。',
+        enText:'Cumulative inspection coverage this week 87%; remaining 13% planned for this weekend.' },
+      { role:'user', text:'@安全 巡检期间是否有作业冲突？', enText:'@Safety any work conflicts during inspection?' },
+      { role:'agent', agent:'safe',
+        text:'08:30-11:00 时段无登高作业冲突，可安全执行无人机巡检。',
+        enText:'08:30–11:00 window has no elevated-work conflicts; drone inspection can proceed safely.' },
+      { role:'user', text:'@工单 自动派单', enText:'@Ticket auto-dispatch' },
+      { role:'agent', agent:'order',
+        text:'已生成工单 W-2625-007，派发驻站员李工，已通知。',
+        enText:'Ticket W-2625-007 generated, assigned to on-site engineer Li, notified.' },
     ]},
-  { id:'s_h4', t:'昨日 14:08', dateLabel:'earlier', agent:'pv', title:'光伏组件 SOP 检索',
+  { id:'s_h4', t:'昨日 14:08', enT:'Yesterday 14:08', dateLabel:'earlier', agent:'pv', title:'光伏组件 SOP 检索', enTitle:'PV Module SOP Lookup',
     msgs:[
-      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-      { role:'user', text:'@光伏 组件绝缘检测的标准流程？' },
-      { role:'agent', agent:'pv', text:'SOP-PV-211 组件绝缘检测，包含 6 步关键操作与 3 项安全注意，是否查看完整文档？' },
-      { role:'user', text:'是的，发给我' },
-      { role:'agent', agent:'pv', text:'已发送至工作台 → 文档中心 → SOP-PV-211。建议巡检前阅读。' },
+      { role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN },
+      { role:'user', text:'@光伏 组件绝缘检测的标准流程？', enText:'@PV Assist standard procedure for module insulation test?' },
+      { role:'agent', agent:'pv',
+        text:'SOP-PV-211 组件绝缘检测，包含 6 步关键操作与 3 项安全注意，是否查看完整文档？',
+        enText:'SOP-PV-211 module insulation test — 6 key steps & 3 safety notes; view full document?' },
+      { role:'user', text:'是的，发给我', enText:'Yes, send it' },
+      { role:'agent', agent:'pv',
+        text:'已发送至工作台 → 文档中心 → SOP-PV-211。建议巡检前阅读。',
+        enText:'Sent to Workbench → Document Center → SOP-PV-211. Recommend reading before inspection.' },
     ]},
-  { id:'s_h5', t:'昨日 10:42', dateLabel:'earlier', agent:'safe', title:'高风险作业 24h 检视',
+  { id:'s_h5', t:'昨日 10:42', enT:'Yesterday 10:42', dateLabel:'earlier', agent:'safe', title:'高风险作业 24h 检视', enTitle:'High-Risk Work 24h Review',
     msgs:[
-      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-      { role:'user', text:'@安全 未来 24h 高风险作业有哪些？' },
-      { role:'agent', agent:'safe', text:'未来 24h：3 项登高作业、1 项带电检修；已对应推送防护建议。' },
-      { role:'user', text:'@安全 带电检修是哪个站？' },
-      { role:'agent', agent:'safe', text:'示范站 INV-04 直流侧检修，作业人 2 名，已要求落实双人监护。' },
-      { role:'user', text:'@排程 调整时间到下午' },
-      { role:'agent', agent:'sched', text:'已与现场协调，作业时间调整至 14:00-16:00，避开早间发电高峰。' },
+      { role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN },
+      { role:'user', text:'@安全 未来 24h 高风险作业有哪些？', enText:'@Safety what high-risk work in the next 24h?' },
+      { role:'agent', agent:'safe',
+        text:'未来 24h：3 项登高作业、1 项带电检修；已对应推送防护建议。',
+        enText:'Next 24h: 3 elevated tasks, 1 live electrical work; protection recommendations pushed.' },
+      { role:'user', text:'@安全 带电检修是哪个站？', enText:'@Safety which site for live electrical work?' },
+      { role:'agent', agent:'safe',
+        text:'示范站 INV-04 直流侧检修，作业人 2 名，已要求落实双人监护。',
+        enText:'Demo Site INV-04 DC-side repair, 2 workers, dual-supervision required.' },
+      { role:'user', text:'@排程 调整时间到下午', enText:'@Schedule move to afternoon' },
+      { role:'agent', agent:'sched',
+        text:'已与现场协调，作业时间调整至 14:00-16:00，避开早间发电高峰。',
+        enText:'Coordinated with site; work rescheduled to 14:00–16:00, avoiding morning peak generation.' },
     ]},
-  { id:'s_h6', t:'05-24 16:20', dateLabel:'earlier', agent:'diag', title:'东源 #01 IV 偏移诊断',
+  { id:'s_h6', t:'05-24 16:20', enT:'05-24 16:20', dateLabel:'earlier', agent:'diag', title:'东源 #01 IV 偏移诊断', enTitle:'Dongyuan #01 IV Drift Diagnosis',
     msgs:[
-      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-      { role:'user', text:'@诊断 东源 #01 最近 IV 曲线异常' },
-      { role:'agent', agent:'diag', text:'近 7 天检测到 5 处 IV 偏移，主要集中在 P3 方阵 INV-04 ~ INV-06。' },
-      { role:'user', text:'@诊断 给出可能原因' },
-      { role:'agent', agent:'diag', text:'可能原因：① 组件 PID 衰减 (置信 64%)；② 组件遮挡 (置信 22%)；③ 接线箱接触不良 (置信 14%)。' },
-      { role:'user', text:'@巡检 安排现场排查' },
-      { role:'agent', agent:'insp', text:'UAV 巡检已安排明日 09:00，结合 IV 数据生成定向检测路径。' },
-      { role:'user', text:'@光伏 PID 治理方案' },
-      { role:'agent', agent:'pv', text:'推荐夜间正向偏压治理，连续 7 晚每晚 8h；预计恢复 75% 衰减功率。' },
+      { role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN },
+      { role:'user', text:'@诊断 东源 #01 最近 IV 曲线异常', enText:'@Diagnose Dongyuan #01 recent IV curve anomalies' },
+      { role:'agent', agent:'diag',
+        text:'近 7 天检测到 5 处 IV 偏移，主要集中在 P3 方阵 INV-04 ~ INV-06。',
+        enText:'5 IV drifts detected in the last 7 days, mainly P3 array INV-04 ~ INV-06.' },
+      { role:'user', text:'@诊断 给出可能原因', enText:'@Diagnose possible causes' },
+      { role:'agent', agent:'diag',
+        text:'可能原因：① 组件 PID 衰减 (置信 64%)；② 组件遮挡 (置信 22%)；③ 接线箱接触不良 (置信 14%)。',
+        enText:'Possible causes: ① PID degradation (64%); ② shading (22%); ③ junction box contact issue (14%).' },
+      { role:'user', text:'@巡检 安排现场排查', enText:'@Inspect arrange on-site check' },
+      { role:'agent', agent:'insp',
+        text:'UAV 巡检已安排明日 09:00，结合 IV 数据生成定向检测路径。',
+        enText:'UAV inspection scheduled tomorrow 09:00, directional path from IV data.' },
+      { role:'user', text:'@光伏 PID 治理方案', enText:'@PV Assist PID mitigation plan' },
+      { role:'agent', agent:'pv',
+        text:'推荐夜间正向偏压治理，连续 7 晚每晚 8h；预计恢复 75% 衰减功率。',
+        enText:'Recommend nightly forward-bias treatment, 8h × 7 nights; est. 75% power recovery.' },
     ]},
-  { id:'s_h7', t:'05-24 09:00', dateLabel:'earlier', agent:'ops', title:'iRun 日报生成 · 周一',
+  { id:'s_h7', t:'05-24 09:00', enT:'05-24 09:00', dateLabel:'earlier', agent:'ops', title:'iRun 日报生成 · 周一', enTitle:'iRun Daily Report · Monday',
     msgs:[
-      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-      { role:'agent', agent:'ops', text:'周一日报已生成：可用率 99.42%、PR 82.8%、人均工单 3.5 张，3 项 KPI 风险已转工单。' },
+      { role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN },
+      { role:'agent', agent:'ops',
+        text:'周一日报已生成：可用率 99.42%、PR 82.8%、人均工单 3.5 张，3 项 KPI 风险已转工单。',
+        enText:'Monday report generated: availability 99.42%, PR 82.8%, 3.5 tickets per person, 3 KPI risks escalated to tickets.' },
     ]},
-  { id:'s_h8', t:'05-23 11:15', dateLabel:'earlier', agent:'order', title:'工单合并方案审议',
+  { id:'s_h8', t:'05-23 11:15', enT:'05-23 11:15', dateLabel:'earlier', agent:'order', title:'工单合并方案审议', enTitle:'Ticket Merge Plan Review',
     msgs:[
-      { role:'sys', text:'已连接 iRun 数字团队 · 10 智能体在线' },
-      { role:'user', text:'@工单 今日待处理工单太分散，能不能合并？' },
-      { role:'agent', agent:'order', text:'今日 14 张工单可合并为 8 张，节省 38 km、56 min。' },
-      { role:'user', text:'@排程 出一份合并方案' },
-      { role:'agent', agent:'sched', text:'合并方案已生成 · 1 人 1 车 1 趟 · 节省里程 38 km、节省时间 56 min。' },
-      { role:'user', text:'@安全 合并后作业是否安全' },
-      { role:'agent', agent:'safe', text:'合并后无作业冲突，已审核通过。' },
-      { role:'user', text:'@工单 按方案下发' },
-      { role:'agent', agent:'order', text:'14 张工单已重排为 8 张派单，已通知现场人员。' },
-      { role:'user', text:'@运营 跟踪结果' },
-      { role:'agent', agent:'ops', text:'已开启工单闭环跟踪，每 30 分钟同步进度至本对话。' },
-      { role:'user', text:'@运营 完成情况' },
-      { role:'agent', agent:'ops', text:'截至 17:00，8 张工单已闭环 7 张，1 张延期至明早。' },
+      { role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN },
+      { role:'user', text:'@工单 今日待处理工单太分散，能不能合并？', enText:"@Ticket today's pending tickets are too scattered — can we merge?" },
+      { role:'agent', agent:'order',
+        text:'今日 14 张工单可合并为 8 张，节省 38 km、56 min。',
+        enText:"Today's 14 tickets can merge into 8, saving 38 km and 56 min." },
+      { role:'user', text:'@排程 出一份合并方案', enText:'@Schedule produce a merge plan' },
+      { role:'agent', agent:'sched',
+        text:'合并方案已生成 · 1 人 1 车 1 趟 · 节省里程 38 km、节省时间 56 min。',
+        enText:'Merge plan ready · 1 person, 1 vehicle, 1 trip · saves 38 km and 56 min.' },
+      { role:'user', text:'@安全 合并后作业是否安全', enText:'@Safety is merged work safe?' },
+      { role:'agent', agent:'safe',
+        text:'合并后无作业冲突，已审核通过。',
+        enText:'No work conflicts after merge; approved.' },
+      { role:'user', text:'@工单 按方案下发', enText:'@Ticket dispatch per plan' },
+      { role:'agent', agent:'order',
+        text:'14 张工单已重排为 8 张派单，已通知现场人员。',
+        enText:'14 tickets re-dispatched as 8 orders; field staff notified.' },
+      { role:'user', text:'@运营 跟踪结果', enText:'@Operate track results' },
+      { role:'agent', agent:'ops',
+        text:'已开启工单闭环跟踪，每 30 分钟同步进度至本对话。',
+        enText:'Ticket close-loop tracking enabled; progress synced to this chat every 30 min.' },
+      { role:'user', text:'@运营 完成情况', enText:'@Operate completion status' },
+      { role:'agent', agent:'ops',
+        text:'截至 17:00，8 张工单已闭环 7 张，1 张延期至明早。',
+        enText:'As of 17:00, 7 of 8 tickets closed; 1 deferred to tomorrow morning.' },
     ]},
 ];
 
@@ -508,6 +581,14 @@ function isKnownPlantName(text) {
   return getKnownPlantNames().some(name => s === name);
 }
 
+function extractPlantNameFromInput(text) {
+  const { body } = splitAgentCommand(text);
+  if (!body) return '';
+  if (isKnownPlantName(body)) return body;
+  const names = [...new Set(getKnownPlantNames())].sort((a, b) => b.length - a.length);
+  return names.find(name => body.includes(name)) || '';
+}
+
 function composePlantInput(text, plantName) {
   const name = String(plantName || '').trim();
   if (!name) return text;
@@ -527,13 +608,17 @@ function composeQuestionInput(prefix, question, plantName) {
 
 function stripPlantNameFromQuestion(text, plant) {
   let clean = stripAgentPrefix(text);
-  const names = [plant?.name, plant?.enName, plant?.short]
-    .filter(Boolean)
-    .map(x => String(x).trim())
-    .filter(Boolean);
-  names.forEach(name => {
-    if (clean.startsWith(name)) clean = clean.slice(name.length).trim();
-  });
+  const names = [...new Set([
+    ...getKnownPlantNames(),
+    plant?.name, plant?.enName, plant?.short,
+  ].filter(Boolean).map(x => String(x).trim()).filter(Boolean))]
+    .sort((a, b) => b.length - a.length);
+  for (const name of names) {
+    if (clean.startsWith(name)) {
+      clean = clean.slice(name.length).trim();
+      break;
+    }
+  }
   return clean;
 }
 
@@ -547,6 +632,11 @@ function findExpoQAFuzzy(list, cleanText) {
 
   const exact = list.find(x => normQaText(x.qZh) === c || normQaText(x.qEn) === c);
   if (exact) return exact;
+
+  const questionInInput = list.filter(x =>
+    c.includes(normQaText(x.qZh)) || c.includes(normQaText(x.qEn))
+  );
+  if (questionInInput.length === 1) return questionInInput[0];
 
   const contains = list.filter(x =>
     normQaText(x.qZh).includes(c) || normQaText(x.qEn).includes(c) ||
@@ -669,7 +759,7 @@ function resolveAgentReply(text, agentId, plant, zh) {
   return { stream: false, text: respondTo(text, agentId, plant) };
 }
 
-function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAgent, onOpenAgent, onCollapse, mode, onDispatchCommand}){
+function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAgent, onClearDispatchPlantCtx, onOpenAgent, onCollapse, mode, onDispatchCommand}){
   const [sessions, setSessions] = useState(_SESSIONS_SEED);
   const [currentId, setCurrentId] = useState('s_cur');
   const [input, setInput] = useState('');
@@ -677,13 +767,21 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   const [searchQ, setSearchQ] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState('');
+  const [activePlantCtx, setActivePlantCtx] = useState(null);
   const bodyRef = useRef(null);
   const inputRef = useRef(null);
   const renameInputRef = useRef(null);
   const streamAbortRef = useRef(null);
+  const prevSelectedAgentRef = useRef(null);
   const l = useLang(); const zh = l !== 'en';
   const plantCtx = dispatchPlantCtx || focusPlant || null;
-  const plantName = plantCtx?.name || '';
+  const plantName = activePlantCtx?.name || '';
+  const bindPlantToQuestions = !!activePlantCtx?.bindToQuestions;
+
+  function consumePlantCtx() {
+    setActivePlantCtx(null);
+    onClearDispatchPlantCtx?.();
+  }
 
   useEffect(() => () => { streamAbortRef.current?.abort?.(); }, []);
 
@@ -739,7 +837,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   function startRename(s, e){
     e?.stopPropagation();
     setEditingId(s.id);
-    setEditValue(s.title);
+    setEditValue(sessTitle(s, zh));
     setTimeout(()=>{
       if (renameInputRef.current){
         renameInputRef.current.focus();
@@ -751,7 +849,9 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
     if (!editingId) return;
     const v = editValue.trim();
     if (v) {
-      setSessions(prev => prev.map(s => s.id===editingId ? {...s, title:v} : s));
+      setSessions(prev => prev.map(s => s.id===editingId
+        ? (zh ? {...s, title:v} : {...s, enTitle:v})
+        : s));
     }
     setEditingId(null);
     setEditValue('');
@@ -767,9 +867,9 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
       const next = prev.filter(s => s.id !== id);
       // ensure there's always at least one session
       if (next.length === 0){
-        const fresh = { id:'s_cur', t:'当前', dateLabel:'today', agent:'ops',
-          title: zh?'当前会话':'Current Session', isCurrent:true,
-          msgs:[{ role:'sys', text: zh?'已连接 iRun 数字团队':'Connected to iRun team' }] };
+        const fresh = { id:'s_cur', t:'当前', enT:'Current', dateLabel:'today', agent:'ops',
+          title:'当前会话', enTitle:'Current Session', isCurrent:true,
+          msgs:[{ role:'sys', text:_SESSIONS_SYS_ZH, enText:_SESSIONS_SYS_EN }] };
         if (currentId === id) setCurrentId('s_cur');
         return [fresh];
       }
@@ -789,8 +889,8 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   const filteredSessions = sessions.filter(s => {
     if (!searchQ) return true;
     const q = searchQ.toLowerCase();
-    return s.title.toLowerCase().includes(q) ||
-           s.msgs.some(m => (m.text||'').toLowerCase().includes(q));
+    return sessTitle(s, zh).toLowerCase().includes(q) ||
+           s.msgs.some(m => msgText(m, zh).toLowerCase().includes(q));
   });
 
   function selectSession(id){
@@ -808,10 +908,12 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
     const p = n => String(n).padStart(2,'0');
     const tLabel = `${p(now.getHours())}:${p(now.getMinutes())}`;
     const fresh = {
-      id, t: tLabel, dateLabel:'today', agent:'ops',
-      title: zh?'新会话':'New Session', isCurrent:true,
+      id, t: tLabel, enT: tLabel, dateLabel:'today', agent:'ops',
+      title: zh?'新会话':'New Session', enTitle:'New Session', isCurrent:true,
       msgs:[
-        { role:'sys', text: zh?'已开始新会话 · iRun 数字团队待命':'New session started · iRun team standby' },
+        { role:'sys',
+          text: zh?'已开始新会话 · iRun 数字团队待命':'New session started · iRun team standby',
+          enText:'New session started · iRun team standby' },
       ],
     };
     setSessions(prev => [fresh, ...prev]);
@@ -822,17 +924,37 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
     setTimeout(()=>{ inputRef.current?.focus(); }, 50);
   }
 
+  // Sync one-shot plant context from map click (consumed on agent switch / send / quick chip).
+  useEffect(()=>{
+    if (!dispatchPlantCtx?.clickKey) return;
+    if (dispatchPlantCtx?.name) {
+      setActivePlantCtx({
+        id: dispatchPlantCtx.id,
+        name: dispatchPlantCtx.name,
+        bindToQuestions: !!dispatchPlantCtx.bindPlantToQuestions,
+      });
+    }
+  }, [dispatchPlantCtx?.clickKey, dispatchPlantCtx?.id, dispatchPlantCtx?.name, dispatchPlantCtx?.bindPlantToQuestions]);
+
   // When an agent is selected, auto-prefill `@<agent> ` into the input and focus it
   useEffect(()=>{
-    if (!selectedAgent) return;
+    if (!selectedAgent) {
+      prevSelectedAgentRef.current = null;
+      return;
+    }
     const ag = _ABI[selectedAgent];
     if (!ag) return;
     const prefix = `@${zh ? ag.short : ag.en} `;
+    const switched = prevSelectedAgentRef.current && prevSelectedAgentRef.current !== selectedAgent;
+    if (switched) consumePlantCtx();
+    const pendingPlant = activePlantCtx?.name || dispatchPlantCtx?.name;
     setInput(prev => {
       const current = splitAgentCommand(prev);
-      if (!current.prefix && isKnownPlantName(current.body)) return prefix + current.body;
+      if (switched || current.prefix) return prefix;
+      if (pendingPlant && isKnownPlantName(current.body)) return prefix + current.body;
       return prefix;
     });
+    prevSelectedAgentRef.current = selectedAgent;
     setTimeout(()=>{
       if (inputRef.current){
         inputRef.current.focus();
@@ -883,6 +1005,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
       }
       return { ...s, msgs: newMsgs, title: newTitle, agent: targetId };
     }));
+    if (activePlantCtx?.name && text.includes(activePlantCtx.name)) consumePlantCtx();
     setInput('');
     onSelectAgent?.(null);
   };
@@ -966,7 +1089,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
                       <div key={s.id}
                            className={`hf-item${active?' active':''}${isEditing?' editing':''}`}
                            onClick={()=>{ if (!isEditing) selectSession(s.id); }}
-                           title={s.title}>
+                           title={sessTitle(s, zh)}>
                         <span className="hf-tag" style={{color:cat?.color, borderColor:(cat?.color||'#666')+'55'}}>{ag?.code}</span>
                         <div className="hf-info">
                           {isEditing ? (
@@ -984,9 +1107,9 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
                               }}
                             />
                           ) : (
-                            <div className="hf-title">{s.title}</div>
+                            <div className="hf-title">{sessTitle(s, zh)}</div>
                           )}
-                          <div className="hf-meta">{s.t}</div>
+                          <div className="hf-meta">{sessTime(s, zh)}</div>
                         </div>
                         {!isEditing && (
                           <div className="hf-actions">
@@ -1024,7 +1147,8 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
 
       <div className="chat-body" ref={bodyRef}>
         {messages.map((m,i)=>{
-          if (m.role==='sys') return <div key={i} className="tag-line" style={{textAlign:'center',padding:'4px 0'}}>· {m.text} ·</div>;
+          const body = msgText(m, zh);
+          if (m.role==='sys') return <div key={i} className="tag-line" style={{textAlign:'center',padding:'4px 0'}}>· {body} ·</div>;
           const ag = m.role==='agent' ? _ABI[m.agent] : null;
           const cat = ag && _CATS[ag.cat];
           return (
@@ -1033,13 +1157,13 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
                 {m.role==='user' ? 'YOU' : ag?.code}
               </div>
               <div className="b">
-                <div className="name">{m.role==='user' ? '指挥官' : ag?.name}</div>
+                <div className="name">{m.role==='user' ? (zh?'指挥官':'Commander') : agentName(ag, zh)}</div>
                 {m.role === 'agent' ? (
                   <>
-                    <Markdown text={m.text} />
+                    <Markdown text={body} />
                     {m.streaming && <span className="stream-cursor">▍</span>}
                   </>
-                ) : <div>{m.text}</div>}
+                ) : <div>{body}</div>}
               </div>
             </div>
           );
@@ -1056,7 +1180,15 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
           const prefix = `@${zh ? ag.short : ag.en} `;
           return (
             <div key={i} className="q-chip" onClick={()=>{
-              setInput(composeQuestionInput(prefix, qLabel, plantName));
+              const plantFromInput = extractPlantNameFromInput(input);
+              const effectivePlant = plantName || plantFromInput;
+              if (effectivePlant && !includesKnownPlantName(qLabel)) {
+                setInput(composeQuestionInput(prefix, qLabel, effectivePlant));
+                if (!bindPlantToQuestions) consumePlantCtx();
+              } else {
+                consumePlantCtx();
+                setInput(prefix + qLabel);
+              }
               setTimeout(()=>{ inputRef.current?.focus(); }, 0);
             }}>
               <span className="tag" style={{color:cat.color}}>@{zh ? ag.short : ag.en}</span>
@@ -1070,8 +1202,8 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
       <div className="composer">
         <input
           ref={inputRef}
-          data-plant-id={dispatchPlantCtx?.id || focusPlant?.id || ''}
-          data-plant-name={dispatchPlantCtx?.name || focusPlant?.name || ''}
+          data-plant-id={activePlantCtx?.id || dispatchPlantCtx?.id || focusPlant?.id || ''}
+          data-plant-name={activePlantCtx?.name || dispatchPlantCtx?.name || focusPlant?.name || ''}
           style={targetAgent ? {'--ph-color': _CATS[targetAgent.cat].color} : undefined}
           placeholder={targetAgent
             ? (zh ? `@${targetAgent.short} 输入指令…` : `@${targetAgent.en} type command…`)
@@ -1176,16 +1308,17 @@ function respondTo(text, agentId, plant){
 // ──────────────────────────────────────────────────────────────────────
 // Agent skill matrix (center of dock)
 function AgentDock({focusPlant, busyMap, onOpen}){
+  const l = useLang(); const zh = l !== 'en';
   const cats = ['management','expert','process','tool'];
   return (
     <div className="panel skill-matrix corners"><span className="c1"/>
       <div className="panel-hd">
-        <span><span className="dot"/> 智能体矩阵 · Agent Skill Matrix</span>
+        <span><span className="dot"/> <T z="智能体矩阵" e="Agent Skill Matrix"/></span>
         <span style={{display:'flex',gap:14,color:'var(--text-mute)',fontSize:10,letterSpacing:'0.12em'}}>
           {cats.map(c => {
             const cat = _CATS[c];
             const n = _AGENTS.filter(a=>a.cat===c).length;
-            return <span key={c}><i style={{display:'inline-block',width:8,height:8,background:cat.color,marginRight:4,verticalAlign:0}}/>{cat.label} · {n}</span>;
+            return <span key={c}><i style={{display:'inline-block',width:8,height:8,background:cat.color,marginRight:4,verticalAlign:0}}/>{catLabel(cat, zh)} · {n}</span>;
           })}
         </span>
       </div>
@@ -1194,8 +1327,11 @@ function AgentDock({focusPlant, busyMap, onOpen}){
           const cat = _CATS[a.cat];
           const isOff = focusPlant && !focusPlant.agents.includes(a.id);
           const busy = busyMap?.[a.id];
-          const status = isOff ? '未启用' : busy ? '工作中' : (Math.random()<0.25?'学习中':'空闲');
-          const statusCls = busy ? 'work' : (status==='学习中' ? 'learn' : 'idle');
+          const status = isOff
+            ? (zh ? '未启用' : 'Off')
+            : busy ? (zh ? '工作中' : 'Working')
+            : (Math.random()<0.25 ? (zh ? '学习中' : 'Learning') : (zh ? '空闲' : 'Idle'));
+          const statusCls = busy ? 'work' : (status===(zh?'学习中':'Learning') ? 'learn' : 'idle');
           return (
             <div key={a.id}
                  className={`agent-card ${busy?'busy':''}`}
@@ -1205,12 +1341,12 @@ function AgentDock({focusPlant, busyMap, onOpen}){
               <div className="top">
                 <div style={{flexShrink:0}}><RobotAvatar agent={a} size={28} glow={busy}/></div>
                 <div>
-                  <div className="nm">{zh ? a.name : a.en}</div>
-                  <div className="rl">{zh ? a.role : (a.enRole || a.role)}</div>
+                  <div className="nm">{agentName(a, zh)}</div>
+                  <div className="rl">{agentRole(a, zh)}</div>
                 </div>
               </div>
               <div className="meta">
-                <span className={`badge ${statusCls}`}>{isOff?'未启用':status}</span>
+                <span className={`badge ${statusCls}`}>{status}</span>
                 <span className="tok" title={`${a.metrics.tokens} tok · ${a.metrics.todayCalls} calls`}>{a.metrics.tokens}k·{a.metrics.todayCalls}</span>
               </div>
             </div>
@@ -1397,15 +1533,15 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
             <div className="profile">
               <div className="avatar">{a.code}</div>
               <div>
-                <h2>{zh ? a.name : a.en}</h2>
-                <div className="role" style={{color:cat.color}}>{cat.label} · {zh ? a.role : (a.enRole || a.role)}</div>
-                <p>{zh ? a.intro : (a.enIntro || a.intro)}</p>
+                <h2>{agentName(a, zh)}</h2>
+                <div className="role" style={{color:cat.color}}>{catLabel(cat, zh)} · {agentRole(a, zh)}</div>
+                <p>{agentIntro(a, zh)}</p>
               </div>
             </div>
             <div className="section" style={{marginTop:18}}>
               <h3>{zh?'核心技能':'Core Skills'}</h3>
               <div className="skill-chips">
-                {a.skills.map((s,si)=><span key={s} style={{color:cat.color,borderColor:cat.color+'55'}}>{zh ? s : (a.enSkills?.[si] || s)}</span>)}
+                {a.skills.map((s,si)=><span key={s} style={{color:cat.color,borderColor:cat.color+'55'}}>{agentSkill(a, si, zh)}</span>)}
               </div>
             </div>
             <div className="section" style={{marginTop:18}}>
@@ -1570,7 +1706,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
                 <div className="tc-top">
                   <RobotAvatar agent={a} size={32} glow={busy}/>
                   <div className="tc-info">
-                    <span className="tc-name">{zh ? a.short : a.en}</span>
+                    <span className="tc-name">{agentShort(a, zh)}</span>
                     <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{zh?'● 运行':'● Active'}</span>
                   </div>
                   <span className="tc-tok">{snap?.tokensText ?? a.metrics.tokens}</span>
@@ -2049,6 +2185,7 @@ function DispatchedRobots({robots, onRobotDone}){
 // provides robotField data; otherwise the single walking PlantRobot is used.
 const getDemoPlantTeamUnavailableIds = (id) => window.IRUN?.getDemoPlantTeamUnavailableIds?.(id) || [];
 function PlantAgentField({plant, busyMap, cur}){
+  const l = useLang(); const zh = l !== 'en';
   if (!plant?.robotField?.length) return null;
   const unavailableAgentIds = new Set(getDemoPlantTeamUnavailableIds(plant?.id));
   const visibleRobots = plant.robotField.filter(r => !r.anchorOnly && !unavailableAgentIds.has(r.agent));
@@ -2068,7 +2205,7 @@ function PlantAgentField({plant, busyMap, cur}){
   const toPos = cur && posMap[cur.to];
   const lineColor = !cur ? '#22d3ee'
                   : cur.type === 'action' ? '#fbbf24'
-                  : cur.tag === '安全' ? '#f87171'
+                  : isSafetyStep(cur) ? '#f87171'
                   : '#22d3ee';
   return (
     <div className="plant-agent-field" aria-hidden="true">
@@ -2109,18 +2246,18 @@ function PlantAgentField({plant, busyMap, cur}){
         if (!ag) return null;
         const active = !!(busyMap && busyMap[r.agent]);
         const showBubble = active && cur && (r.agent === speaker);
-        const tagClass = cur?.tag ? ` tag-${cur.type==='action'?'mid':(cur.tag==='安全'?'high':'low')}` : '';
+        const tagClass = cur ? ` tag-${cur.type==='action'?'mid':(isSafetyStep(cur)?'high':'low')}` : '';
         return (
           <div key={r.agent}
                className={`paf-robot${active?' active':''}`}
                style={{left:`${r.x}%`, top:`${r.y}%`, animationDelay:`${i*0.3}s`}}>
             {showBubble && (
-              <div className={`paf-bubble${tagClass}`} key={`b-${cur.text}`}>
+              <div className={`paf-bubble${tagClass}`} key={`b-${stepText(cur, zh)}`}>
                 <div className="paf-bubble-head">
                   <span className="paf-bubble-code">{ag.code}</span>
-                  {cur.tag && <span className="paf-bubble-tag">{cur.tag}</span>}
+                  {cur.tag && <span className="paf-bubble-tag">{stepTag(cur, zh)}</span>}
                 </div>
-                <div className="paf-bubble-text">{cur.text}</div>
+                <div className="paf-bubble-text">{stepText(cur, zh)}</div>
               </div>
             )}
             <RobotAvatar agent={ag} size={56} glow={active}/>
@@ -2387,18 +2524,27 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
           <div className="tt-hd">
             <div className="tt-avatar"><RobotAvatar agent={hovered} size={46} glow/></div>
             <div className="tt-name">
-              <div className="tt-en">{hovered.en}</div>
-              <div className="tt-cn">{hovered.name}</div>
-              <div className="tt-cat" style={{color: hoveredCat.color}}>{hoveredCat.label} · {hovered.role}</div>
+              {zh ? (
+                <>
+                  <div className="tt-en">{hovered.en}</div>
+                  <div className="tt-cn">{hovered.name}</div>
+                </>
+              ) : (
+                <>
+                  <div className="tt-en">{agentName(hovered, zh)}</div>
+                  <div className="tt-cn">@{agentShort(hovered, zh)}</div>
+                </>
+              )}
+              <div className="tt-cat" style={{color: hoveredCat.color}}>{catLabel(hoveredCat, zh)} · {agentRole(hovered, zh)}</div>
             </div>
             <button className="tt-detail-btn"
                     onClick={(e)=>{ e.stopPropagation(); onOpen?.(hovered.id); setHoverId(null); }}>
               {zh?'查看详情 →':'Details →'}
             </button>
           </div>
-          <div className="tt-body">{hovered.intro}</div>
+          <div className="tt-body">{agentIntro(hovered, zh)}</div>
           <div className="tt-skills">
-            {hovered.skills.map(s => <span key={s} style={{borderColor: hoveredCat.color+'55', color: hoveredCat.color}}>{s}</span>)}
+            {hovered.skills.map((s, i) => <span key={s} style={{borderColor: hoveredCat.color+'55', color: hoveredCat.color}}>{agentSkill(hovered, i, zh)}</span>)}
           </div>
           <div className="tt-stats">
             <div><span className="l">{zh?'今日调用':'Calls'}</span><span className="v">{hovered.metrics.todayCalls}</span></div>

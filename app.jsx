@@ -130,12 +130,24 @@ function App(){
             }
           ])
         );
+        const norm = window.IRUN_FETCH?.normalizePlantApiFields;
         const next = (window.IRUN?.PLANTS || plants).map(p => {
           const item = nameById.get(String(p.id));
-          // 获取installCapacity·
-          return item ? { ...p,...item, name: item.name, enName: item.name,power:Number(item.installCapacity) } : p;
+          if (!item) return p;
+          const kpi = norm ? norm(item, p) : {
+            installCapacity: Number(item.installCapacity ?? p.capacity ?? 0),
+            power: Number(item.realTimePower ?? item.realTimePowerValue ?? p.power ?? 0),
+            dayEnergy: Number(item.dayEnergy ?? item.dayEnergyValue ?? p.gen ?? 0),
+          };
+          return {
+            ...p,
+            ...item,
+            name: item.name,
+            enName: item.name,
+            capacity: kpi.installCapacity || p.capacity,
+            ...kpi,
+          };
         });
-        console.log('next',next)
         if (cancelled) return;
         setPlants(next);
         if (window.IRUN){
@@ -285,11 +297,12 @@ function App(){
             // 保存一份点击时的电站上下文，供调度输入框使用（怎么用由你决定）
             const p = plant || plants.find(x => x.id === id);
             const resetDispatchInput = dispatchCollapsed && !!selectedAgent;
+            const bindPlantToQuestions = dispatchCollapsed && !isDispatchHiddenPlant(id);
             if (resetDispatchInput) setSelectedAgent(null);
             const clickKey = `${id}:${Date.now()}`;
             setDispatchPlantCtx(p
-              ? { id: p.id, name: p.name, resetInput: resetDispatchInput, clickKey }
-              : { id, name: '', resetInput: resetDispatchInput, clickKey });
+              ? { id: p.id, name: p.name, resetInput: resetDispatchInput, bindPlantToQuestions, clickKey }
+              : { id, name: '', resetInput: resetDispatchInput, bindPlantToQuestions, clickKey });
             const hideDispatch = isDispatchHiddenPlant(id);
             if (!dispatchCollapsed) {
               setStreamCollapsed(true);
@@ -324,11 +337,14 @@ function App(){
               try{
                 const alarmRes = await window.IRUN_FETCH?.getPlantAlarmList?.(p.id);
                 const kpiRes = await window.IRUN_FETCH?.getPlantKpi?.(p.id);
+                const norm = window.IRUN_FETCH?.normalizePlantApiFields;
+                const kpiFields = norm && kpiRes ? norm(kpiRes, p) : null;
                 setPlants(prev => {
                   const next = prev.map(pp => {
                     if (String(pp.id) !== String(id)) return pp;
                     return {
                       ...pp,
+                      ...(kpiFields || {}),
                       alarmTotal: alarmRes.total,
                       alarmList: alarmRes?.rows,
                       pendingAlerts: alarmRes.total > 0 ? Math.floor(Math.random() * (alarmRes.total - 1)) + 1 : 0,
@@ -382,7 +398,7 @@ function App(){
           <div className={`right-rail ${dispatchCollapsed?'collapsed':''}`}>
             {dispatchCollapsed
               ? <DispatchTab onExpand={()=>toggleDispatch(false)}/>
-              : <DispatchPanel focusPlant={focusPlant} dispatchPlantCtx={dispatchPlantCtx} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)} mode={mode} onDispatchCommand={onDispatchCommand}/>
+              : <DispatchPanel focusPlant={focusPlant} dispatchPlantCtx={dispatchPlantCtx} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onClearDispatchPlantCtx={()=>setDispatchPlantCtx(null)} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)} mode={mode} onDispatchCommand={onDispatchCommand}/>
             }
           </div>
         )}

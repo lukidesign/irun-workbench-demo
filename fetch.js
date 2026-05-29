@@ -100,6 +100,21 @@ async function demo() {
     return { ping, profile, echo };
 }
 
+/** 将 list-v2 / detail 接口字段统一为 TopBar 使用的 installCapacity、power、dayEnergy */
+function normalizePlantApiFields(item, fallback = {}) {
+    const installCapacity = Number(
+        item?.installCapacity ?? item?.installCapacityValue ?? fallback.installCapacity ?? fallback.capacity ?? 0
+    );
+    const power = Number(
+        item?.realTimePower ?? item?.realTimePowerValue ?? item?.currentPower
+        ?? item?.power ?? fallback.power ?? 0
+    );
+    const dayEnergy = Number(
+        item?.dayEnergy ?? item?.dayEnergyValue ?? item?.dayGen ?? fallback.dayEnergy ?? fallback.gen ?? 0
+    );
+    return { installCapacity, power, dayEnergy };
+}
+
 // 获取所有电站列表,
 async function getPlantList() {
     const response = await request('/power-station/overview/list-v2', {
@@ -187,5 +202,6 @@ window.IRUN_FETCH = {
     getToken: _getToken,
     baseUrl,
     getPlantAlarmList,
-    getPlantKpi
+    getPlantKpi,
+    normalizePlantApiFields,
 };
