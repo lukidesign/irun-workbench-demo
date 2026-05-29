@@ -125,18 +125,17 @@ const PLANTS = [
     defaultScenarioIdx: 0,
     // Multi-robot field — same logical layout as Hanoi-N (PV array + ops on top, field below)
     robotField: [
-      // ── 沿屋顶光伏巡检环线顺时针分布（左下起 → 左缘上行 → 顶边右行 → 右楼上部 → 右端折回 → 前缘返回）──
-      { agent:'alert', x:25, y:50 },  // 告警 — 左楼前缘左下起点（红线起点）
-      { agent:'warn',  x:24, y:40 },  // 预警 — 左楼左上角，环线左缘
-      { agent:'diag',  x:35, y:38 },  // 诊断 — 左楼顶边中段
-      { agent:'insp',  x:48, y:35 },  // 巡检 — 两楼交界·顶边主线（B 主角）
-      { agent:'sched', x:57, y:32 },  // 排程 — 右楼上部沿顶边
-      { agent:'drone', x:64, y:29, anchorOnly: true },  // 无人机起降点 — 仅连线锚点，不渲染静态图标（点 UAV 按钮才飞行）
-      { agent:'ops',   x:69, y:37 },  // 运营 — 右端折点（环线最右·总览）
-      { agent:'query', x:65, y:41 },  // 问数 — 右楼前缘，开始返程
-      { agent:'order', x:56, y:42 },  // 工单 — 右楼前缘中段
-      { agent:'pv',    x:46, y:45 },  // 光伏助手 — 两楼前缘下方（现场支持）
-      { agent:'safe',  x:33, y:47 },  // 安全 — 左楼前缘下方（现场安全·回到起点）
+      { agent:'alert', x:25, y:50 },
+      { agent:'warn',  x:24, y:40 },
+      { agent:'diag',  x:35, y:38 },
+      { agent:'insp',  x:48, y:35 },
+      { agent:'sched', x:57, y:32 },
+      { agent:'drone', x:64, y:29 },
+      { agent:'ops',   x:69, y:37 },
+      { agent:'query', x:65, y:41 },
+      { agent:'order', x:56, y:42 },
+      { agent:'pv',    x:46, y:45 },
+      { agent:'safe',  x:33, y:47 },
     ],
   },
 

@@ -712,6 +712,14 @@ body{
   box-shadow:none;
 }
 .pid-card.pid-no-open:hover::before,.pid-card.pid-no-open:hover::after{border-color:rgba(34,211,238,0.5)}
+.pid-card.pid-card-dimmed{
+  opacity:0.42;filter:grayscale(0.75);pointer-events:none;
+}
+.pid-card.pid-card-dimmed:hover{
+  transform:none;box-shadow:none;
+}
+.pid-card.pid-card-dimmed:hover::before,
+.pid-card.pid-card-dimmed:hover::after{border-color:var(--line)}
 
 .pid-c-kpi{flex:1 1 320px;min-width:280px}
 .pid-c-team{flex:1 1 250px;min-width:220px}
@@ -1383,6 +1391,11 @@ body{
 .mode-tabs button.on{background:rgba(34,211,238,0.1);color:var(--cyan)}
 .mode-tabs.mode-tabs-locked button:disabled,
 .pid-k-mode.pid-k-mode-locked button:disabled{opacity:0.38;cursor:not-allowed;color:var(--text-dim)}
+.pid-k-mode.pid-k-mode-locked button.on:disabled{
+  opacity:1;cursor:not-allowed;color:var(--cyan);
+  border-color:var(--cyan);background:rgba(34,211,238,0.1);
+  box-shadow:0 0 6px rgba(34,211,238,0.18);
+}
 .pid-tl-lbl-only{color:var(--cyan);letter-spacing:0.06em;font-size:11px}
 .detail-close{
   width:30px;height:30px;border:1px solid var(--line);display:grid;place-items:center;color:var(--text-dim);
