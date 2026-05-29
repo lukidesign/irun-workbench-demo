@@ -17,6 +17,36 @@ const {
   TENANTS: _TENANTS
 } = window.IRUN;
 
+function Markdown({ text }) {
+  const md = String(text ?? '');
+  // Fallback: if deps aren't loaded, render as plain text.
+  if (!window.marked || !window.DOMPurify) return <div style={{whiteSpace:'pre-wrap'}}>{md}</div>;
+
+  // Configure marked for chat rendering.
+  try {
+    window.marked.setOptions?.({ gfm: true, breaks: true, mangle: false, headerIds: false });
+  } catch (e) {}
+
+  let html = '';
+  try {
+    html = window.marked.parse(md);
+  } catch (e) {
+    return <div style={{whiteSpace:'pre-wrap'}}>{md}</div>;
+  }
+
+  // Sanitize + force external links to be safe.
+  const clean = window.DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ADD_ATTR: ['target', 'rel'],
+  });
+
+  // Post-process links with target=_blank
+  const withSafeLinks = clean
+    .replaceAll('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+
+  return <div className="md-body" dangerouslySetInnerHTML={{ __html: withSafeLinks }} />;
+}
+
 // ──────────────────────────────────────────────────────────────────────
 // Live clock
 function useClock(){
@@ -80,6 +110,7 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
   const clock = useClock();
   const zh = lang !== 'en';
   const [plantPickerOpen, setPlantPickerOpen] = useState(false);
+  const [overview, setOverview] = useState(null);
   const pickerRef = React.useRef(null);
   // Click-outside + ESC to close the plant picker
   React.useEffect(()=>{
@@ -97,15 +128,58 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
       document.removeEventListener('keydown', onKey);
     };
   }, [plantPickerOpen]);
+
+  // When no plant is focused, fetch overview KPIs from API
+  useEffect(() => {
+    if (focusPlant) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await window.IRUN_FETCH?.getPlantPowerGenerationOverview?.();
+        if (!cancelled) setOverview(res || null);
+      } catch (e) {
+        if (!cancelled) setOverview(null);
+        console.warn('getPlantPowerGenerationOverview failed', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [focusPlant?.id]);
+
   const A = agg || _AGG;
-  const k = focusPlant ? {
-    cap: focusPlant.capacity, pwr: focusPlant.power, gen: focusPlant.gen, al: focusPlant.alerts,
-    plants: 1, risk: focusPlant.risk === 'high' ? 1 : 0,
-  } : {
-    cap: A.capacity, pwr: A.power, gen: A.gen, al: A.alerts,
-    plants: A.plants, risk: A.risk,
-  };
-  const util = (k.pwr / k.cap * 100).toFixed(1);
+  const k = focusPlant
+    ? {
+        // 将 plant 上下文合并进 k，便于上层直接使用（id/name/enName/alarmStatus/alarmList 等）
+        ...focusPlant,
+        cap: focusPlant?.installCapacity ? Number(focusPlant.installCapacity) : 0,
+        pwr: focusPlant?.power ? Number(focusPlant.power) : 0,
+        gen: focusPlant?.dayEnergy ? Number(focusPlant.dayEnergy) : 0,
+        al: focusPlant?.alarmTotal ? Number(focusPlant.alarmTotal) : 0,
+        plants: 1,
+        risk: focusPlant.risk === 'high' ? 1 : 0,
+        pendingAlerts: Number(focusPlant.pendingAlerts ?? 0),
+        noiseReductionRate:focusPlant?.noiseReductionRate? Number(focusPlant.noiseReductionRate ?? 0):0,
+        powerRate: ((Number(focusPlant?.power || 0) / (Number(focusPlant?.installCapacity || 0) || 1)) * 100).toFixed(1),
+      }
+    : (overview
+        ? {
+          ...overview,
+            cap: Number(overview.cap || 0),
+            pwr: Number(overview.pwr || 0),
+            gen: Number(overview.gen || 0),
+            al:  Number(overview.al  || 0),
+            plants: A.plants,
+            risk: Number(overview.risk || 0),
+            noiseReductionRate: Number(overview.noiseReductionRate ?? 0),
+            pendingAlerts: Number(overview.pendingAlerts ?? 0),
+          }
+        : {
+            cap: A.capacity, pwr: A.power, gen: A.gen, al: A.alerts,
+            plants: A.plants, risk: A.risk,
+            noiseReductionRate: 0,
+            pendingAlerts: 0,
+          });
+  const util = k.powerRate
+  const yoy = React.useMemo(() => (Math.random() * 10).toFixed(1), [focusPlant?.id]);
 
   return (
     <div className="topbar">
@@ -113,14 +187,6 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
         <div className="brand-mark"><img src="irun-icon.png" alt="iRun" className="brand-icon"/></div>
         <div className="brand-text">
           <b>iRUN<span style={{color:'var(--cyan)'}}>·</span>WORKBENCH</b>
-          <div className="brand-tenant">
-                        <select value={tenantIdx} onChange={e=>onTenant(Number(e.target.value))}>
-              {_TENANTS.map((t,i)=>(
-                <option key={t.id} value={i}>{t.name}</option>
-              ))}
-            </select>
-            <span className="bt-arrow">▼</span>
-          </div>
         </div>
       </div>
 
@@ -152,7 +218,7 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
                        }}>
                     <span className={`cpm-dot cpm-dot-${p.risk||'low'}`}/>
                     <span className="cpm-name">{zh ? p.name : (p.enName || p.name)}</span>
-                    <span className="cpm-meta">{p.capacity.toFixed(1)} MW</span>
+                    <span className="cpm-meta">{p.power.toFixed(1)} kWp</span>
                   </div>
                 ))}
               </div>
@@ -165,27 +231,28 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
         <div className="kpi">
           <div className="l">{zh?'在管电站':'Stations'}</div>
           <div className="v mono">{k.plants}<small>{zh?`座 · ${focusPlant?'当前聚焦':'全租户'}`:`· ${focusPlant?'Current':'All'}`}</small></div>
-          <div className="kpi-bar"><i style={{width: focusPlant?'100%':'82%'}}/></div>
         </div>
         <div className="kpi">
           <div className="l">{zh?'装机容量':'Capacity'}</div>
-          <div className="v mono">{k.cap.toFixed(1)}<small>MW</small></div>
-          <div className="delta">▲ 18.2 MW · YTD</div>
+          <div className="v mono">{k.cap.toFixed(1)}<small>MWp</small></div>
         </div>
         <div className="kpi">
           <div className="l">{zh?'实时功率':'Live Power'}</div>
-          <div className="v mono">{k.pwr.toFixed(1)}<small>MW · {util}%</small></div>
+          <div className="v mono" style={{whiteSpace:'nowrap'}}>{k.pwr.toFixed(1)}<small>MW · {util}%</small></div>
           <div className="kpi-bar"><i style={{width:util+'%'}}/></div>
         </div>
         <div className="kpi">
           <div className="l">{zh?'今日发电':"Today's Gen"}</div>
           <div className="v mono">{k.gen.toFixed(1)}<small>MWh</small></div>
-          <div className="delta">▲ 4.6% · {zh?'同比':'YoY'}</div>
+          <div className="delta">▲ {yoy}% · {zh?'同比':'YoY'}</div>
         </div>
         <div className="kpi">
           <div className="l">{zh?'活跃告警':'Alerts'}</div>
-          <div className="v mono" style={{color: k.al>10?'var(--rose)':'#fff'}}>{k.al}<small>{zh?`条 · 待研判 ${Math.max(0,k.al-12)}`:`· Pending ${Math.max(0,k.al-12)}`}</small></div>
-          <div className="delta warn">{zh?'告警去噪率 71%':'Noise Reduction 71%'}</div>
+          <div className="v mono" style={{color: k.al>10?'var(--rose)':'#fff'}}>
+            {k.al}
+            <small>{zh?`条 · 待研判 ${Math.max(0, k.pendingAlerts ?? Math.max(0,k.al-12))}`:`· Pending ${Math.max(0, k.pendingAlerts ?? Math.max(0,k.al-12))}`}</small>
+          </div>
+          <div className="delta warn">{zh?'告警去噪率 '+k.noiseReductionRate+'%':'Noise Reduction '+k.noiseReductionRate+'%'}</div>
         </div>
         <div className="kpi">
           <div className="l">{zh?'KPI 风险':'KPI Risk'}</div>
@@ -278,7 +345,6 @@ function EventStream({focusPlant, scenarioEvents, onCollapse}){
       <div className="panel-hd">
         <span><span className="dot"/> <T z="实时事件流" e="Event Stream"/></span>
         <span style={{display:'flex',alignItems:'center',gap:10,color:'var(--text-mute)',fontSize:10}}>
-          <span>EVENT · STREAM</span>
           <button className="panel-collapse" onClick={onCollapse} title="收起">‹</button>
         </span>
       </div>
@@ -399,7 +465,7 @@ const _SESSIONS_SEED = [
     ]},
 ];
 
-function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, onCollapse, mode, onDispatchCommand}){
+function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAgent, onOpenAgent, onCollapse, mode, onDispatchCommand}){
   const [sessions, setSessions] = useState(_SESSIONS_SEED);
   const [currentId, setCurrentId] = useState('s_cur');
   const [input, setInput] = useState('');
@@ -500,7 +566,7 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
     if (!selectedAgent) return;
     const ag = _ABI[selectedAgent];
     if (!ag) return;
-    const prefix = `@${ag.short} `;
+    const prefix = `@${zh ? ag.short : ag.en} `;
     setInput(prev => {
       // strip any previous @prefix and replace with the new one
       const stripped = prev.replace(/^@\S+\s*/, '');
@@ -514,6 +580,15 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
       }
     }, 30);
   },[selectedAgent]);
+
+  // Clicking a plant on the map can push context into dispatch input.
+  // Requirement: set plant name as the input value (you decide how to use it later).
+  useEffect(()=>{
+    const name = dispatchPlantCtx?.name;
+    if (!name) return;
+    setInput(name);
+    setTimeout(()=>{ inputRef.current?.focus(); }, 0);
+  }, [dispatchPlantCtx?.id, dispatchPlantCtx?.name]);
 
   const send = (text, agentId) => {
     if(!text.trim()) return;
@@ -558,7 +633,6 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
           <T z="对话调度" e="AI Dispatch"/>
         </span>
         <span style={{display:'flex',alignItems:'center',gap:10,color:'var(--text-mute)',fontSize:10}}>
-          <span>DISPATCH · CONSOLE</span>
           <button className="panel-collapse" onClick={onCollapse} title="收起">›</button>
         </span>
       </div>
@@ -659,7 +733,7 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
               </div>
               <div className="b">
                 <div className="name">{m.role==='user' ? '指挥官' : ag?.name}</div>
-                <div>{m.text}</div>
+                {m.role === 'agent' ? <Markdown text={m.text} /> : <div>{m.text}</div>}
               </div>
             </div>
           );
@@ -667,22 +741,32 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
       </div>
 
       <div className="quick">
-        {_QP.map((q,i)=>{
+        {(() => {
+          const list = selectedAgent ? _QP.filter(x => x.a === selectedAgent) : _QP;
+          return list.map((q,i)=>{
           const ag = _ABI[q.a];
           const cat = _CATS[ag.cat];
           const qLabel = zh ? q.t : (q.en || q.t);
           return (
-            <div key={i} className="q-chip" onClick={()=>send(qLabel, q.a)}>
+            <div key={i} className="q-chip" onClick={()=>{
+              onSelectAgent?.(q.a);
+              const prefix = `@${zh ? ag.short : ag.en} `;
+              setInput(prefix + qLabel);
+              setTimeout(()=>{ inputRef.current?.focus(); }, 0);
+            }}>
               <span className="tag" style={{color:cat.color}}>@{zh ? ag.short : ag.en}</span>
               <span>{qLabel}</span>
             </div>
           );
-        })}
+          });
+        })()}
       </div>
 
       <div className="composer">
         <input
           ref={inputRef}
+          data-plant-id={dispatchPlantCtx?.id || focusPlant?.id || ''}
+          data-plant-name={dispatchPlantCtx?.name || focusPlant?.name || ''}
           style={targetAgent ? {'--ph-color': _CATS[targetAgent.cat].color} : undefined}
           placeholder={targetAgent
             ? (zh ? `@${targetAgent.short} 输入指令…` : `@${targetAgent.en} type command…`)
@@ -710,6 +794,30 @@ function DispatchPanel({focusPlant, selectedAgent, onSelectAgent, onOpenAgent, o
 function respondTo(text, agentId, plant){
   const ag = _ABI[agentId];
   const ctx = plant ? `（${plant.short}）` : '';
+  // PV Expo fixed Q&A: exact-match on the recommended questions (CN/EN)
+  if (agentId === 'pv') {
+    const cleanText = String(text || '').replace(/^@\S+\s*/, '').trim();
+    const list = window.IRUN?.PV_EXPO_QA || [];
+    const hit = list.find(x => x && (x.qZh === cleanText || x.qEn === cleanText));
+    if (hit) {
+      // Return the answer language based on which question was matched.
+      return hit.qEn === cleanText ? hit.aEn : hit.aZh;
+    }
+  }
+  // PV Expo (2026) fixed dialogues for Data Q&A agent
+  if (agentId === 'query') {
+    const cleanText = String(text || '').replace(/^@\S+\s*/, '').trim();
+    const list = window.IRUN?.PV_EXPO_QUERY_QA || [];
+    const hit = list.find(x => x && (x.qZh === cleanText || x.qEn === cleanText));
+    if (hit) return hit.qEn === cleanText ? hit.aEn : hit.aZh;
+  }
+  // PV Expo (2026) fixed dialogues for Alarm agent
+  if (agentId === 'alert') {
+    const cleanText = String(text || '').replace(/^@\S+\s*/, '').trim();
+    const list = window.IRUN?.PV_EXPO_ALERT_QA || [];
+    const hit = list.find(x => x && (x.qZh === cleanText || x.qEn === cleanText));
+    if (hit) return hit.qEn === cleanText ? hit.aEn : hit.aZh;
+  }
   // canned replies depending on agent
   switch(agentId){
     case 'ops':   return `日报已生成${ctx}：可用率 99.41%、PR 82.6%、人均工单 3.7 张，3 项 KPI 风险已转工单。`;
@@ -840,7 +948,7 @@ function QuickFuncs({focusPlant, totalTokens, busyCount}){
 
 // ──────────────────────────────────────────────────────────────────────
 // Agent modal — drill into a single agent's working pane
-function AgentModal({agentId, onClose, busyMap}){
+function AgentModal({agentId, onClose, busyMap, onChat}){
   if(!agentId) return null;
   const l = useLang(); const zh = l !== 'en';
   const a = _ABI[agentId];
@@ -947,9 +1055,17 @@ function AgentModal({agentId, onClose, busyMap}){
             <div className="section" style={{marginTop:18}}>
               <h3>操作</h3>
               <div style={{display:'flex',gap:8,marginTop:8}}>
-                <button className="q-chip" style={{borderColor:cat.color+'66',color:cat.color}}>与该智能体对话 →</button>
-                <button className="q-chip">查看历史工单</button>
-                <button className="q-chip">暂停 / 待机</button>
+                <button
+                  className="q-chip"
+                  style={{borderColor:cat.color+'66',color:cat.color}}
+                  onClick={(e)=>{
+                    e.stopPropagation();
+                    onChat?.(agentId);
+                    onClose?.();
+                  }}
+                >
+                  与该智能体对话 →
+                </button>
               </div>
             </div>
           </div>
@@ -1093,7 +1209,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
                   <RobotAvatar agent={a} size={32} glow={busy}/>
                   <div className="tc-info">
                     <span className="tc-name">{zh ? a.short : a.en}</span>
-                    <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{busy ? (zh?'● 运行':'● Active') : (zh?'○ 空闲':'○ Idle')}</span>
+                    <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{zh?'● 运行':'● Active'}</span>
                   </div>
                   <span className="tc-tok">{a.metrics.tokens}</span>
                 </div>
@@ -1524,12 +1640,12 @@ function PlantAgentField({plant, busyMap, cur}){
         if (r.agent === 'drone') {
           // Drone flies along a serpentine inspection route over the PV arrays.
           // No inline left/top — the @keyframes paf-drone-fly animation drives motion.
-          return (
-            <div key={i} className="paf-drone paf-drone-flying">
-              <img src="wrj001.png" alt=""/>
-              <div className="paf-badge paf-badge-drone">UAV</div>
-            </div>
-          );
+          // return (
+          //   <div key={i} className="paf-drone paf-drone-flying">
+          //     <img src="wrj001.png" alt=""/>
+          //     <div className="paf-badge paf-badge-drone">UAV</div>
+          //   </div>
+          // );
         }
         const ag = _ABI[r.agent];
         if (!ag) return null;
@@ -1571,12 +1687,10 @@ function EventStreamTab({onExpand, count=0}){
         {zh ? (
           <>
             <span className="vlabel">实 时 事 件 流</span>
-            <span className="vsub">EVENT&nbsp;·&nbsp;STREAM</span>
           </>
         ) : (
           <span className="vlabel vlabel-en">EVENT STREAM</span>
         )}
-        {count>0 && <span className="vcount">{count}</span>}
       </div>
     </div>
   );
@@ -1593,7 +1707,6 @@ function DispatchTab({onExpand, unread=0}){
         {zh ? (
           <>
             <span className="vlabel">对 话 调 度</span>
-            <span className="vsub">DISPATCH</span>
           </>
         ) : (
           <span className="vlabel vlabel-en">AI DISPATCH</span>
@@ -1761,18 +1874,20 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
                  className={`agent-tile ${selected===a.id?'active':''} ${isOff?'off':''} ${busy?'busy':''}`}
                  style={{'--cat-color':cat.color}}
                  onMouseEnter={(e)=>handleEnter(a.id, e)}
-                 onClick={()=>onSelect?.(a.id)}
+                 onClick={()=>{
+                   onSelect?.(a.id);
+                   setHoverId(null);
+                 }}
                  onDoubleClick={()=>onOpen?.(a.id)}>
               <div className="robot-wrap">
                 <RobotAvatar agent={a} size={42} glow={busy || selected===a.id}/>
-                {a.notif > 0 && <span className="badge-count">{a.notif}</span>}
                 {busy && <span className="status-dot work"/>}
                 {!busy && !isOff && <span className="status-dot online"/>}
                 {isOff && <span className="status-dot off"/>}
               </div>
               <div className="agent-tile-name">
                 <div className="nm-en">{zh ? a.short : a.en}</div>
-                <div className="nm-cn">{zh ? a.en : (a.enRole || a.role)}</div>
+                {/* <div className="nm-cn">{zh ? a.en : (a.enRole || a.role)}</div> */}
               </div>
             </div>
           );

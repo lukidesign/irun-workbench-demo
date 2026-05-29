@@ -8,7 +8,9 @@ const { Scene3D } = window.IRUN_SCENE3D;
 const { PLANTS: APP_PLANTS, TENANTS: APP_TENANTS, AGENTS: APP_AGENTS, AGENT_BY_ID: APP_ABI, aggregateOf: APP_AGG_OF } = window.IRUN;
 
 function App(){
+  const [plants, setPlants] = useState(() => window.IRUN?.PLANTS || APP_PLANTS || []);
   const [focusId, setFocusId] = useState(null);
+  const [dispatchPlantCtx, setDispatchPlantCtx] = useState(null); // { id, name }
   const [openAgent, setOpenAgent] = useState(null);
   const [openSkillMarket, setOpenSkillMarket] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState(null);
@@ -45,7 +47,7 @@ function App(){
     setViewMode(prev => prev === 'img2' ? 'map2' : prev);
   }, []);
   // Plants visible under the current tenant
-  const tenantPlants = APP_PLANTS.filter(p => p.tenant === tenant.id);
+  const tenantPlants = plants.filter(p => p.tenant === tenant.id);
   const tenantAgg = APP_AGG_OF ? APP_AGG_OF(tenantPlants) : { plants: tenantPlants.length, capacity:0, power:0, gen:0, alerts:0, risk:0 };
   const [lang, setLang] = useState(()=>{ try{ return localStorage.getItem('irun:lang')||'zh'; }catch(e){ return 'zh'; } });
   const [theme, setTheme] = useState(()=>{ try{ return localStorage.getItem('irun:theme')||'light'; }catch(e){ return 'light'; } });
@@ -107,7 +109,41 @@ function App(){
     return ()=>window.removeEventListener('resize', apply);
   },[]);
 
-  const focusPlant = focusId ? APP_PLANTS.find(p=>p.id===focusId) : null;
+  const focusPlant = focusId ? plants.find(p=>p.id===focusId) : null;
+
+  // Page load: fetch station list and override plant name/enName by id
+  useEffect(()=>{
+    let cancelled = false;
+    (async ()=>{
+      try{
+        const {rows:list = []} = await window.IRUN_FETCH?.getPlantList?.();
+        const nameById = new Map(
+          list.map(x => [
+            String(x.id),
+            {
+              ...x
+            }
+          ])
+        );
+        const next = (window.IRUN?.PLANTS || plants).map(p => {
+          const item = nameById.get(String(p.id));
+          // 获取installCapacity·
+          return item ? { ...p,...item, name: item.name, enName: item.name,power:Number(item.installCapacity) } : p;
+        });
+        console.log('next',next)
+        if (cancelled) return;
+        setPlants(next);
+        if (window.IRUN){
+          window.IRUN.PLANTS = next;
+          if (window.IRUN.aggregateOf) window.IRUN.AGGREGATE = window.IRUN.aggregateOf(next);
+        }
+      } catch(e){
+        // keep demo data if request fails
+        console.warn('getPlantList failed', e);
+      }
+    })();
+    return ()=>{ cancelled = true; };
+  }, []);
 
   // When scenario step fires, mark from/to as busy and emit an event into the global stream
   const onStep = useCallback((step, idx, scenario) => {
@@ -181,7 +217,7 @@ function App(){
 
       {/* full-bleed image background (image modes + map2 展示) */}
       {(viewMode === 'img2') && (() => {
-        const idx = focusPlant ? APP_PLANTS.findIndex(p=>p.id===focusPlant.id) : -1;
+        const idx = focusPlant ? plants.findIndex(p=>p.id===focusPlant.id) : -1;
         const suffix = theme === 'light' ? 'qian' : '';
         const bg = idx >= 0
           ? `plant${String(idx+1).padStart(3,'0')}${suffix}.png`
@@ -209,20 +245,67 @@ function App(){
       )}
 
       {/* full-screen plants map / 3D scene */}
-      {viewMode === 'map' && <PlantsMap focusId={focusId} onFocus={setFocusId}/>}
-      {viewMode === 'map2' && <Map2Overlay focusId={focusId} onFocus={(id)=>{ setFocusId(id); setViewMode('img2'); }} subMode={map2SubMode} tenantId={tenant.id}/>}
+      {viewMode === 'map' && <PlantsMap plants={plants} focusId={focusId} onFocus={setFocusId}/>}
+      {viewMode === 'map2' && (
+        <Map2Overlay
+          plants={plants}
+          focusId={focusId}
+          onFocus={(id, plant)=>{
+            // 保存一份点击时的电站上下文，供调度输入框使用（怎么用由你决定）
+            const p = plant || plants.find(x => x.id === id);
+            setDispatchPlantCtx(p ? { id: p.id, name: p.name } : { id, name: '' });
+            // dispatch 展开时：只做上面这一步，不改变 focusPlant（TopBar / 详情等保持不变）
+            if (!dispatchCollapsed) return;
+            // dispatch 折叠时：保持原行为（更新焦点并进入 img2）
+            setFocusId(id);
+            setViewMode('img2');
+
+            // 先把点击时的 plant 同步写入 plants，保证 focusPlant 立即拿到这份上下文
+            if (p){
+              setPlants(prev => {
+                const next = prev.map(pp => String(pp.id) === String(id) ? ({ ...pp, ...p }) : pp);
+                if (window.IRUN) window.IRUN.PLANTS = next;
+                return next;
+              });
+            }
+
+            // dispatch 折叠时：把点击的 plant 相关告警拉取回来，更新到 plants，
+            // 这样 TopBar 的 focusPlant->k 会使用最新 alerts/alarmStatus 等字段
+            (async ()=>{
+              try{
+                const alarmRes = await window.IRUN_FETCH?.getPlantAlarmList?.(p.id);
+                const kpiRes = await window.IRUN_FETCH?.getPlantKpi?.(p.id);
+                setPlants(prev => {
+                  const next = prev.map(pp => {
+                    if (String(pp.id) !== String(id)) return pp;
+                    return {
+                      ...pp,
+                      alarmTotal: alarmRes.total,
+                      alarmList: alarmRes?.rows,
+                      pendingAlerts: alarmRes.total > 0 ? Math.floor(Math.random() * (alarmRes.total - 1)) + 1 : 0,
+                      risk: kpiRes?.tags?.includes('KPI_SEVERE') || kpiRes?.tags?.includes('KPI_GENERAL') ? 1 : 0,
+                      noiseReductionRate:Math.floor(Math.random() * 10) + 70
+                    };
+                  });
+                  if (window.IRUN) window.IRUN.PLANTS = next;
+                  return next;
+                });
+              }catch(e){
+                console.warn('getPlantAlarmList failed', e);
+              }
+            })();
+          }}
+          subMode={map2SubMode}
+          tenantId={tenant.id}
+        />
+      )}
 
       {/* map2 toggle — theme-aware:
             light → 图1 / 图2 (qian backgrounds)
             dark  → 展示 / 漫游 (rjgf001 + manyou001) */}
       {viewMode === 'map2' && (
         <div className="map2-toggle">
-          {theme === 'light' ? (
-            <>
-              <button className={`map2-toggle-btn${map2SubMode==='pic1'?' active':''}`} onClick={()=>setMap2SubMode('pic1')}>{lang==='en'?'Img 1':'图1'}</button>
-              <button className={`map2-toggle-btn${map2SubMode==='pic2'?' active':''}`} onClick={()=>setMap2SubMode('pic2')}>{lang==='en'?'Img 2':'图2'}</button>
-            </>
-          ) : (
+          {theme === 'light' ? null : (
             <>
               <button className={`map2-toggle-btn${map2SubMode==='show'?' active':''}`} onClick={()=>setMap2SubMode('show')}>{lang==='en'?'View':'展示'}</button>
               <button className={`map2-toggle-btn${map2SubMode==='roam'?' active':''}`} onClick={()=>setMap2SubMode('roam')}>{lang==='en'?'Roam':'漫游'}</button>
@@ -247,7 +330,7 @@ function App(){
         <div className={`right-rail ${dispatchCollapsed?'collapsed':''}`}>
           {dispatchCollapsed
             ? <DispatchTab onExpand={()=>toggleDispatch(false)}/>
-            : <DispatchPanel focusPlant={focusPlant} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)} mode={mode} onDispatchCommand={onDispatchCommand}/>
+            : <DispatchPanel focusPlant={focusPlant} dispatchPlantCtx={dispatchPlantCtx} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)} mode={mode} onDispatchCommand={onDispatchCommand}/>
           }
         </div>
       </div>
@@ -296,8 +379,9 @@ function App(){
           : <AgentTokenPanel busyMap={busyMap} onOpen={setOpenAgent}/>}
       </div>
 
-      {/* plant detail overlay — popup mode (click any inline card) or auto-open in non-img2 modes */}
-      {focusPlant && (viewMode !== 'img2' || showPlantModal) && (
+      {/* plant detail overlay — popup mode (click any inline card) or auto-open in non-img2 modes
+          NOTE: map2 点选电站用于调度输入上下文时，不自动弹出详情 */}
+      {focusPlant && (((viewMode !== 'img2') && (viewMode !== 'map2')) || showPlantModal) && (
         <PlantDetail
           plant={focusPlant}
           scenario={scenario}
@@ -314,7 +398,17 @@ function App(){
       )}
 
       {/* agent modal */}
-      {openAgent && <AgentModal agentId={openAgent} onClose={()=>setOpenAgent(null)} busyMap={busyMap}/>}
+      {openAgent && (
+        <AgentModal
+          agentId={openAgent}
+          onClose={()=>setOpenAgent(null)}
+          busyMap={busyMap}
+          onChat={(id)=>{
+            setSelectedAgent(id);
+            if (id && dispatchCollapsed) toggleDispatch(false);
+          }}
+        />
+      )}
 
       {/* skill market modal */}
       {openSkillMarket && <SkillModal onClose={()=>setOpenSkillMarket(false)}/>}

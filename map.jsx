@@ -1,7 +1,9 @@
 // iRun Workbench — full-screen plants map (background, behind UI)
-const { PLANTS: _MAP_PLANTS } = window.IRUN;
+// IMPORTANT: do not cache `window.IRUN.PLANTS` at module load time.
+// App can replace plant names from API after page load.
 
-function PlantsMap({focusId, onFocus}){
+function PlantsMap({focusId, onFocus, plants}){
+  const list = plants || window.IRUN?.PLANTS || [];
   return (
     <div className="map-wrap">
       <svg className="map-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
@@ -41,7 +43,7 @@ function PlantsMap({focusId, onFocus}){
         <ellipse cx="74" cy="80" rx="3" ry="1.8" fill="rgba(34,211,238,0.04)" stroke="rgba(34,211,238,0.18)" strokeWidth="0.12"/>
 
         {/* connections between same-tenant plants */}
-        {_MAP_PLANTS.map((p,i)=> _MAP_PLANTS.slice(i+1).map((q,j)=>{
+        {list.map((p,i)=> list.slice(i+1).map((q,j)=>{
           if(p.tenant !== q.tenant) return null;
           return <line key={p.id+q.id}
             x1={p.x} y1={p.y} x2={q.x} y2={q.y}
@@ -49,7 +51,7 @@ function PlantsMap({focusId, onFocus}){
         }))}
 
         {/* plant markers */}
-        {_MAP_PLANTS.map(p=>{
+        {list.map(p=>{
           const focus = p.id===focusId;
           const glow = p.risk==='high'?'url(#plant-glow-bad)': p.risk==='mid'?'url(#plant-glow-warn)':'url(#plant-glow)';
           const colour = p.risk==='high'?'#f87171': p.risk==='mid'?'#fbbf24':'#22d3ee';
@@ -81,7 +83,7 @@ function PlantsMap({focusId, onFocus}){
           MAP · SE-ASIA / SOUTH-CN · 1:25M
         </text>
         <text x="98" y="98" textAnchor="end" style={{fontSize:1.2, fill:'rgba(140,160,200,0.4)', fontFamily:'JetBrains Mono'}}>
-          PLANTS · {_MAP_PLANTS.length} SITES · LIVE
+          PLANTS · {list.length} SITES · LIVE
         </text>
       </svg>
     </div>
@@ -91,9 +93,10 @@ function PlantsMap({focusId, onFocus}){
 // Map2Overlay — floating plant pins for map2 (city background) mode
 // Each plant carries its own mapX / mapY (% of canvas) in data.js,
 // so we just filter by current tenant and render in place.
-function Map2Overlay({ focusId, onFocus, subMode, tenantId }) {
+function Map2Overlay({ focusId, onFocus, subMode, tenantId, plants }) {
   const zh = React.useContext(window.IRUN_UI?.LangCtx || React.createContext('zh')) !== 'en';
-  const visible = _MAP_PLANTS.filter(p => (!tenantId || p.tenant === tenantId) && p.mapX && p.mapY);
+  const list = plants || window.IRUN?.PLANTS || [];
+  const visible = list.filter(p => (!tenantId || p.tenant === tenantId) && p.mapX && p.mapY);
   return (
     <div className="map2-overlay">
       {(subMode === 'show' || subMode === 'pic1' || subMode === 'pic2') && (
@@ -113,12 +116,16 @@ function Map2Overlay({ focusId, onFocus, subMode, tenantId }) {
         </>
       )}
       {visible.map((plant, i) => {
-        const colour = plant.risk==='high' ? '#f87171' : plant.risk==='mid' ? '#fbbf24' : '#22d3ee';
-        const statusLabel = plant.risk==='high'
-          ? (zh?'⚠ 高风险':'⚠ High')
-          : plant.risk==='mid'
-            ? (zh?'△ 关注':'△ Watch')
-            : (zh?'✓ 正常':'✓ Normal');
+        let colour = '#22d3ee';
+        let statusLabel = (zh?'✓ 正常':'✓ Normal')
+        if(plant?.alarmStatus==='alarm'){
+          colour = '#fbbf24'
+          statusLabel = (zh?'△ 关注':'△ Watch')
+        }
+        if(plant?.tags?.includes('KPI_SEVERE')){
+          colour = '#f87171'
+          statusLabel = (zh?'⚠ 高风险':'⚠ High')
+        }
         const fullName = zh ? plant.name : (plant.enName || plant.name);
         const pinName = (fullName.split('·').pop() || plant.short).trim();
         return (
@@ -130,11 +137,11 @@ function Map2Overlay({ focusId, onFocus, subMode, tenantId }) {
               '--pin-color': colour,
               animationDelay: `${i * 0.45}s`
             }}
-            onClick={() => onFocus(plant.id)}
+            onClick={() => onFocus(plant.id, plant)}
           >
             <div className="map2-pin-label">
               <span className="map2-pin-name">{pinName}</span>
-              <span className="map2-pin-meta">{plant.power}MW · {statusLabel}</span>
+              <span className="map2-pin-meta">{plant.power}kWp · {statusLabel}</span>
             </div>
             <div className="map2-pin-line"/>
             <div className="map2-pin-dot">
