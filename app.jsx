@@ -154,8 +154,8 @@ function App(){
   const onStep = useCallback((step, idx, scenario) => {
     if (!step) return;
     const m = {};
-    if (APP_ABI[step.from]) m[step.from] = true;
-    if (APP_ABI[step.to])   m[step.to]   = true;
+    if (step.from) m[step.from] = true;
+    if (step.to)   m[step.to]   = true;
     setBusyMap(m);
   }, []);
 
@@ -403,6 +403,7 @@ function App(){
               scenario={scenario}
               stepIdx={stepIdx}
               cur={cur}
+              busyMap={busyMap}
               mode={mode}
               scenarioIdx={scenarioIdx}
               onModeChange={handleModeChange}

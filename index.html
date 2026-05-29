@@ -826,7 +826,11 @@ body{
 .pid-scene-cell{background:rgba(34,211,238,0.05);border:1px solid rgba(34,211,238,0.1)}
 .pid-scene-cell.hot{background:rgba(248,113,113,0.22);border-color:rgba(248,113,113,0.45);animation:hot 1.4s ease-in-out infinite}
 .pid-scene-cell.work{background:rgba(34,211,238,0.22);border-color:var(--cyan)}
-.pid-scene-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.pid-scene-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.pid-scene-wrap .pid-particle{
+  position:absolute;width:4px;height:4px;border-radius:50%;
+  transform:translate(-50%,-50%);pointer-events:none;z-index:4;
+}
 .pid-scene-node{
   position:absolute;transform:translate(-50%,-50%);pointer-events:none;
 }
@@ -2026,6 +2030,7 @@ body{
 <script src="data.js"></script>
 <script src="fetch.js"></script>
 <script src="tokenData.js"></script>
+<script src="agentTokenData.js"></script>
 <script type="text/babel" src="components.jsx"></script>
 <script type="text/babel" src="map.jsx"></script>
 <script type="text/babel" src="scene3d.jsx"></script>
