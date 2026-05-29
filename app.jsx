@@ -380,7 +380,7 @@ function App(){
         tooltipEnabled={dispatchCollapsed}/>
 
       {/* drone fly overlay */}
-      {droneFlying && <DroneFlight onDone={()=>setDroneFlying(false)}/>}
+      {droneFlying && <DroneFlight onDone={()=>setDroneFlying(false)} plant={focusPlant}/>}
 
       {/* img2 plant view:
             - command mode → clear field, render any dispatched walking robots

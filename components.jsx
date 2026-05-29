@@ -1442,65 +1442,107 @@ function PlantTitle({plant, plants, onChange}){
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// DroneFlight — animated drone that loops twice on an ellipse, then flies off
-function DroneFlight({onDone}){
-  const [pos, setPos] = useState({x: 960, y: 240, opacity: 0, rot: 0});
+// DroneFlight — triggered only by clicking the UAV button (AgentsRail).
+//  · JOHOR-COMMERCIAL (id 1881233694553112576): flies a serpentine inspection
+//    route over the rooftop PV arrays, one round trip (there & back), then fades
+//    out — rendered with the robotField static-drone icon style.
+//  · Overview / all other plants: keeps the original behaviour — ellipse loop ×2
+//    then flies off, with the original glowing icon + shadow.
+const JOHOR_PLANT_ID = '1881233694553112576';
+function DroneFlight({onDone, plant}){
+  const isJohor = plant?.id === JOHOR_PLANT_ID;
+  const [pos, setPos] = useState(isJohor
+    ? {x: 326, y: 756, opacity: 0, rot: 0}
+    : {x: 960, y: 240, opacity: 0, rot: 0});
   const startRef = useRef(null);
   const rafRef = useRef(null);
 
   useEffect(()=>{
-    const cx = 960, cy = 540, rx = 720, ry = 300;
-    const loopDur = 5.5;      // seconds per loop
-    const totalLoops = 2;
-    const fadeIn = 0.4;
-    const exitDur = 1.8;
-    const totalDur = totalLoops * loopDur + exitDur;
-
-    const tick = (t) => {
-      if(!startRef.current) startRef.current = t;
-      const elapsed = (t - startRef.current) / 1000;
-
-      if(elapsed < totalLoops * loopDur){
-        // start at top (-PI/2) and rotate clockwise
-        const theta = -Math.PI/2 + (elapsed / loopDur) * Math.PI * 2;
-        const x = cx + rx * Math.cos(theta);
-        const y = cy + ry * Math.sin(theta);
-        // tangent direction (image faces right by default)
-        const tx = -rx * Math.sin(theta);
-        const ty =  ry * Math.cos(theta);
-        const rot = Math.atan2(ty, tx) * 180 / Math.PI;
-        const opacity = Math.min(1, elapsed / fadeIn);
-        setPos({x, y, opacity, rot});
-        rafRef.current = requestAnimationFrame(tick);
-      } else if(elapsed < totalDur){
-        // exit upward + right
-        const u = (elapsed - totalLoops * loopDur) / exitDur;
-        const startX = cx + rx * Math.cos(-Math.PI/2);
-        const startY = cy + ry * Math.sin(-Math.PI/2);
-        const x = startX + (2400 - startX) * u;
-        const y = startY + (-300 - startY) * u;
-        const rot = -25;
-        const opacity = Math.max(0, 1 - u * 0.7);
-        setPos({x, y, opacity, rot});
-        rafRef.current = requestAnimationFrame(tick);
-      } else {
-        onDone?.();
+    let tick;
+    if(isJohor){
+      // ── Serpentine round-trip over JOHOR-COMMERCIAL rooftop (1920×1080 space) ──
+      // Traces the red line: lower-left start → waves across front roof →
+      // sharp peak over the building gap → rise to far-right end near OPS.
+      const fwd = [
+        [326, 756], [460, 730], [560, 668], [660, 720], [770, 660],
+        [880, 712], [960, 540], [1075, 668], [1248, 565], [1421, 486],
+      ];
+      const path = fwd.concat(fwd.slice(0, -1).reverse());  // forward then back
+      const segLen = [];
+      let total = 0;
+      for(let i=1;i<path.length;i++){
+        const d = Math.hypot(path[i][0]-path[i-1][0], path[i][1]-path[i-1][1]);
+        segLen.push(d); total += d;
       }
-    };
+      const travelDur = 11;   // seconds for the full round trip
+      const fadeIn = 0.5, fadeOut = 0.9;
+      const sample = (dist) => {
+        let d = dist, i = 0;
+        while(i < segLen.length && d > segLen[i]){ d -= segLen[i]; i++; }
+        if(i >= segLen.length) i = segLen.length-1;
+        const t = segLen[i] ? d/segLen[i] : 0;
+        return {
+          x: path[i][0] + (path[i+1][0]-path[i][0])*t,
+          y: path[i][1] + (path[i+1][1]-path[i][1])*t,
+        };
+      };
+      tick = (tm) => {
+        if(!startRef.current) startRef.current = tm;
+        const elapsed = (tm - startRef.current) / 1000;
+        if(elapsed >= travelDur){ onDone?.(); return; }
+        const {x, y} = sample((elapsed / travelDur) * total);
+        let opacity = 1;
+        if(elapsed < fadeIn) opacity = elapsed / fadeIn;
+        else if(elapsed > travelDur - fadeOut) opacity = Math.max(0, (travelDur - elapsed) / fadeOut);
+        setPos({x, y, opacity, rot: 0});
+        rafRef.current = requestAnimationFrame(tick);
+      };
+    } else {
+      // ── Original ellipse: loop ×2 then fly off up-right ──
+      const cx = 960, cy = 540, rx = 720, ry = 300;
+      const loopDur = 5.5, totalLoops = 2, fadeIn = 0.4, exitDur = 1.8;
+      const totalDur = totalLoops * loopDur + exitDur;
+      tick = (t) => {
+        if(!startRef.current) startRef.current = t;
+        const elapsed = (t - startRef.current) / 1000;
+        if(elapsed < totalLoops * loopDur){
+          const theta = -Math.PI/2 + (elapsed / loopDur) * Math.PI * 2;
+          const x = cx + rx * Math.cos(theta);
+          const y = cy + ry * Math.sin(theta);
+          const tx = -rx * Math.sin(theta);
+          const ty =  ry * Math.cos(theta);
+          const rot = Math.atan2(ty, tx) * 180 / Math.PI;
+          setPos({x, y, opacity: Math.min(1, elapsed / fadeIn), rot});
+          rafRef.current = requestAnimationFrame(tick);
+        } else if(elapsed < totalDur){
+          const u = (elapsed - totalLoops * loopDur) / exitDur;
+          const startX = cx + rx * Math.cos(-Math.PI/2);
+          const startY = cy + ry * Math.sin(-Math.PI/2);
+          const x = startX + (2400 - startX) * u;
+          const y = startY + (-300 - startY) * u;
+          setPos({x, y, opacity: Math.max(0, 1 - u * 0.7), rot: -25});
+          rafRef.current = requestAnimationFrame(tick);
+        } else {
+          onDone?.();
+        }
+      };
+    }
     rafRef.current = requestAnimationFrame(tick);
     return ()=>{ if(rafRef.current) cancelAnimationFrame(rafRef.current); };
   },[]);
 
+  // Icon is always the robotField static-drone style (upright + UAV badge);
+  // only the flight route differs (serpentine for JOHOR, ellipse for others).
   return (
-    <div className="drone-flight"
+    <div className="drone-flight uav-static"
          style={{
            left: pos.x+'px',
            top: pos.y+'px',
            opacity: pos.opacity,
-           transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`
+           transform: 'translate(-50%,-50%)'
          }}>
       <img src="wrj001.png" alt="UAV"/>
-      <div className="drone-shadow"/>
+      <div className="paf-badge paf-badge-drone">UAV</div>
     </div>
   );
 }
