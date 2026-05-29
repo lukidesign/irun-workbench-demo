@@ -173,6 +173,7 @@ function App(){
         setMode('auto');
         setScenarioIdx(demo.scenarioIdx);
       } else {
+        setMode('command');
         const def = typeof focusPlant.defaultScenarioIdx === 'number' ? focusPlant.defaultScenarioIdx : 0;
         setScenarioIdx(def);
       }
@@ -190,18 +191,24 @@ function App(){
     } else {
       setDispatchCollapsed(false);
       try { localStorage.setItem('irun:dispatch-collapsed', '0'); } catch (e) {}
+      setStreamCollapsed(true);
+      try { localStorage.setItem('irun:stream-collapsed', '1'); } catch (e) {}
     }
   }, [focusId]);
 
   const hideDispatchRail = isDispatchHiddenPlant(focusPlant?.id);
+  const hideStreamRail = !!focusId && !isDispatchHiddenPlant(focusId);
 
   const handleModeChange = useCallback((next) => {
-    if (getDemoPlantProfile(focusPlant?.id) && next === 'command') return;
+    const demo = getDemoPlantProfile(focusPlant?.id);
+    if (demo && next === 'command') return;
+    if (focusPlant?.id && !demo && next === 'auto') return;
     setMode(next);
   }, [focusPlant?.id]);
 
   const handleScenarioChange = useCallback((idx) => {
     if (getDemoPlantProfile(focusPlant?.id)) return;
+    if (focusPlant?.id && !getDemoPlantProfile(focusPlant?.id)) return;
     setScenarioIdx(idx);
   }, [focusPlant?.id]);
 
@@ -282,6 +289,10 @@ function App(){
             if (hideDispatch) toggleDispatch(true);
             else if (dispatchCollapsed) toggleDispatch(false);
             if (hideDispatch) toggleStream(false);
+            else {
+              setStreamCollapsed(true);
+              try { localStorage.setItem('irun:stream-collapsed', '1'); } catch (e) {}
+            }
             // dispatch 展开时：只做上面这一步，不改变 focusPlant（TopBar / 详情等保持不变）
             // 隐藏调度电站：仍进入 img2 焦点视图
             if (!hideDispatch && !dispatchCollapsed) return;
@@ -349,12 +360,14 @@ function App(){
 
       {/* left + right rails over map */}
       <div className="stage">
-        <div className={`left-rail ${streamCollapsed?'collapsed':''}`}>
-          {streamCollapsed
-            ? <EventStreamTab onExpand={()=>toggleStream(false)}/>
-            : <EventStream onCollapse={()=>toggleStream(true)}/>
-          }
-        </div>
+        {!hideStreamRail && (
+          <div className={`left-rail ${streamCollapsed?'collapsed':''}`}>
+            {streamCollapsed
+              ? <EventStreamTab onExpand={()=>toggleStream(false)}/>
+              : <EventStream onCollapse={()=>toggleStream(true)}/>
+            }
+          </div>
+        )}
         <div className="center-stretch"/>
         {!hideDispatchRail && (
           <div className={`right-rail ${dispatchCollapsed?'collapsed':''}`}>

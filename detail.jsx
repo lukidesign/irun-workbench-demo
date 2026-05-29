@@ -412,6 +412,7 @@ function PlantInlineDock({plant, scenario, stepIdx, cur, busyMap, mode, scenario
   },[stepIdx, scenario.id]);
 
   const demoProfile = getPlantDemoProfile(plant);
+  const isStandard = !demoProfile;
 
   return (
     <div className="plant-inline-dock">
@@ -424,11 +425,11 @@ function PlantInlineDock({plant, scenario, stepIdx, cur, busyMap, mode, scenario
         plant={plant} activeAgentIds={activeAgentIds} forceGrayInsp={!!demoProfile?.grayInspInTeam}/>
 
       <PIDCardLog
-        scenario={scenario} steps={visibleSteps}/>
+        scenario={scenario} steps={visibleSteps} isStandard={isStandard}/>
 
       <PIDCardScene
         plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur}
-        busyMap={busyMap}/>
+        busyMap={busyMap} isStandard={isStandard}/>
 
       <PIDCardToken plant={plant}/>
     </div>
@@ -439,11 +440,15 @@ function PlantInlineDock({plant, scenario, stepIdx, cur, busyMap, mode, scenario
 function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress, demoProfile, onModeChange, onScenarioChange}){
   const zh = _useD_Lang() !== 'en';
   const stopProp = e => e.stopPropagation();
+  const isStandard = !demoProfile;
+  const modeLocked = !!demoProfile || isStandard;
   return (
     <div className="pid-card pid-c-kpi pid-no-open">
       <div className="pid-k-top">
         <b className="pid-k-name">{zh ? plant.name : (plant.enName || plant.name)}</b>
-        <button className="pid-k-btn">▶ {zh?'播放':'Play'}</button>
+        {demoProfile && (
+          <button className="pid-k-btn">▶ {zh?'播放':'Play'}</button>
+        )}
       </div>
       <div className="pid-k-sub">{zh ? plant.region : (plant.enRegion || plant.region)} · {plant.capacity} MW · {zh?'实时功率':'Live'} {plant.power} MW</div>
       <div className="pid-k-stats">
@@ -451,31 +456,35 @@ function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress,
         <div className="s"><span className="l">{zh?'告警':'Alerts'}</span><span className="v" style={{color: plant.alerts>4?'var(--rose)':'#fff'}}>{plant.alerts}</span></div>
         <div className="s"><span className="l">PR</span><span className="v">{(82+plant.id.charCodeAt(1)%7).toFixed(1)}%</span></div>
       </div>
-      <div className={`pid-k-mode${demoProfile ? ' pid-k-mode-locked' : ''}`}>
-        <button className={mode==='auto'?'on':''} onClick={(e)=>{stopProp(e); onModeChange('auto');}}>{zh?'托管模式':'Auto'}</button>
-        <button
-          className={mode==='command'?'on':''}
-          disabled={!!demoProfile}
-          onClick={(e)=>{stopProp(e); onModeChange('command');}}>{zh?'指挥模式':'Command'}</button>
+      <div className={`pid-k-mode${modeLocked ? ' pid-k-mode-locked' : ''}`}>
+        {isStandard ? (
+          <>
+            <button className="on" disabled type="button">{zh?'指挥模式':'Command'}</button>
+            <button disabled type="button">{zh?'托管模式':'Auto'}</button>
+          </>
+        ) : (
+          <>
+            <button
+              className={mode==='auto' ? 'on' : ''}
+              type="button"
+              onClick={(e)=>{stopProp(e); onModeChange('auto');}}>{zh?'托管模式':'Auto'}</button>
+            <button
+              className={mode==='command' ? 'on' : ''}
+              disabled={!!demoProfile}
+              type="button"
+              onClick={(e)=>{stopProp(e); onModeChange('command');}}>{zh?'指挥模式':'Command'}</button>
+          </>
+        )}
       </div>
-      <div className="pid-k-tl">
-        <div className="pid-tl-chips">
-          {demoProfile ? (
+      {demoProfile && (
+        <div className="pid-k-tl">
+          <div className="pid-tl-chips">
             <span className="pid-tl-lbl pid-tl-lbl-only">{zh ? demoProfile.timelineZh : demoProfile.timelineEn}</span>
-          ) : (
-            <>
-              {_SCENARIOS.map((s,i)=>(
-                <button key={s.id}
-                  className={`pid-q-chip${i===scenarioIdx?' on':''}`}
-                  onClick={(e)=>{stopProp(e); onScenarioChange(i);}}>{s.id}</button>
-              ))}
-              <span className="pid-tl-lbl">{zh?'场景':'Scenario'} {scenario.id} · {scenario.title}</span>
-            </>
-          )}
+          </div>
+          <div className="pid-tl-track"><i style={{width: progress+'%'}}/></div>
+          <div className="pid-tl-step">step {stepIdx+1}/{scenario.steps.length} · {cur?.tag||''}</div>
         </div>
-        <div className="pid-tl-track"><i style={{width: progress+'%'}}/></div>
-        <div className="pid-tl-step">step {stepIdx+1}/{scenario.steps.length} · {cur?.tag||''}</div>
-      </div>
+      )}
     </div>
   );
 }
@@ -551,7 +560,7 @@ function formatStepDate(dateStr) {
 }
 
 // ── Card 3: Multi-agent collaboration log (auto-scroll)
-function PIDCardLog({scenario, steps}){
+function PIDCardLog({scenario, steps, isStandard}){
   const zh = _useD_Lang() !== 'en';
   const ref = useRef(null);
   useEffect(()=>{
@@ -560,7 +569,9 @@ function PIDCardLog({scenario, steps}){
   return (
     <div className="pid-card pid-c-log pid-no-open">
       <div className="pid-h">
-        <span>{zh?'多 Agent 协同日志':'Multi-Agent Log'}</span>
+        <span>{isStandard
+          ? (zh ? '指挥调度日志' : 'Command Dispatch Log')
+          : (zh ? '多 Agent 协同日志' : 'Multi-Agent Log')}</span>
         <span className="pid-h-badge">{steps.length}/{scenario.steps.length}</span>
       </div>
       <div className="pid-log-body" ref={ref}>
@@ -593,7 +604,7 @@ function PIDCardLog({scenario, steps}){
 }
 
 // ── Card 5: Full scene (PV grid + agent field + flow line + bubble)
-function PIDCardScene({plant, scenario, stepIdx, cur, busyMap}){
+function PIDCardScene({plant, scenario, stepIdx, cur, busyMap, isStandard}){
   const zh = _useD_Lang() !== 'en';
   const hotCells = useMemo(()=>[16, 17, 28, 29, 64, 76, 88], [plant.id]);
 
@@ -637,7 +648,7 @@ function PIDCardScene({plant, scenario, stepIdx, cur, busyMap}){
   const speakerPos = speaker ? posMap[speaker] : null;
 
   return (
-    <div className="pid-card pid-c-scene pid-no-open">
+    <div className={`pid-card pid-c-scene pid-no-open${isStandard ? ' pid-card-dimmed' : ''}`}>
       <div className="pid-h">
         <span>{zh?'协同图谱':'Collab Graph'}</span>
         <span className="pid-h-meta">{sceneNodes.length} nodes</span>
