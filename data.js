@@ -142,25 +142,7 @@ const PLANTS = [
 
   { id: '1879736307422691328', name: '', enName: '',  short: 'Penang-W',  tenant: 'ilp', region: 'Malaysia·槟城',  enRegion: 'Malaysia · Penang',    city: '槟城',     enCity: 'Penang',
     capacity: 32.0, power: 0, gen: 138.0, alerts: 3, risk: 'mid',  status: '托管中',   enStatus: 'Managed',
-    x: 55, y: 32, mapX: '27%', mapY: '55%',
-    agents: ['ops','warn','safe','alert','diag','order','sched','pv','insp','query'],
-    // Default to Scenario B (UAV inspection — FPV water-surface site)
-    defaultScenarioIdx: 1,
-    // Multi-robot field — Penang FPV 水面光伏巡检场景
-    robotField: [
-      { agent:'insp',  x:52, y:42 },  // 巡检 — 水面阵列中央（B 场景主角）
-      { agent:'drone', x:64, y:32 },  // 无人机起降点 — 右上角起降区
-      { agent:'diag',  x:44, y:50 },  // 诊断 — 阵列中部靠左
-      { agent:'alert', x:35, y:55 },  // 告警 — 左侧监控区
-      { agent:'warn',  x:29, y:46 },  // 预警 — 左边缘
-      { agent:'order', x:37, y:23 },  // 工单 — 上部偏左
-      { agent:'sched', x:49, y:17 },  // 排程 — 顶部中央
-      { agent:'safe',  x:42, y:57 },  // 安全 — 下方通道（水上作业安全）
-      { agent:'pv',    x:56, y:56 },  // 光伏助手 — 下部右侧
-      { agent:'query', x:60, y:21 },  // 问数 — 上部中右
-      { agent:'ops',   x:69, y:27 },  // 运营 — 右上部
-    ],
-  },
+    x: 55, y: 32, mapX: '27%', mapY: '55%', agents: ['ops','warn','alert','diag','order','sched','query'] },
 ];
 
 // Compute aggregate KPIs for a subset of plants (used by TopBar per-tenant)
