@@ -5,6 +5,11 @@ const { AGENT_BY_ID: _D_ABI, AGENT_CATEGORIES: _D_CAT, SCENARIOS: _SCENARIOS, AG
 function getPlantDemoProfile(plant) {
   return window.IRUN?.getDemoPlantProfile?.(plant?.id) || null;
 }
+function getPlantTeamUnavailableIds(plant) {
+  return window.IRUN?.getDemoPlantTeamUnavailableIds?.(plant?.id)
+    || getPlantDemoProfile(plant)?.teamUnavailableAgentIds
+    || [];
+}
 const { LangCtx: _D_LANG } = window.IRUN_UI || {};
 const _useD_Lang = () => React.useContext(_D_LANG || React.createContext('zh'));
 
@@ -394,7 +399,7 @@ function TokenStrip({plant, stepIdx}){
 
 // ─────────────────────────────────────────────────────────────────────
 // PlantInlineDock — inline 6-card dashboard for img2 mode (replaces popup)
-function PlantInlineDock({plant, scenario, stepIdx, cur, mode, scenarioIdx, onModeChange, onScenarioChange}){
+function PlantInlineDock({plant, scenario, stepIdx, cur, busyMap, mode, scenarioIdx, onModeChange, onScenarioChange}){
   const steps = scenario.steps || [];
   const lastT = steps.length ? steps[steps.length - 1].t : 0;
   const totalDur = lastT + 1500;
@@ -423,7 +428,7 @@ function PlantInlineDock({plant, scenario, stepIdx, cur, mode, scenarioIdx, onMo
 
       <PIDCardScene
         plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur}
-        activeAgentIds={activeAgentIds}/>
+        busyMap={busyMap}/>
 
       <PIDCardToken plant={plant}/>
     </div>
@@ -479,6 +484,14 @@ function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress,
 function PIDCardTeam({plant, activeAgentIds, forceGrayInsp}){
   const zh = _useD_Lang() !== 'en';
   const ALL_IDS = ['ops','warn','alert','diag','safe','order','sched','pv','insp','query'];
+  const unavailableAgentIds = new Set(getPlantTeamUnavailableIds(plant));
+  const hasTeamOverride = unavailableAgentIds.size > 0;
+  const isAssigned = (id) => {
+    if(forceGrayInsp && id === 'insp') return false;
+    if(hasTeamOverride) return !unavailableAgentIds.has(id);
+    return plant.agents.includes(id);
+  };
+  const assignedCount = ALL_IDS.filter(isAssigned).length;
   const listRef = useRef(null);
   const [scrollOffset, setScrollOffset] = useState(0);
   useEffect(()=>{
@@ -500,16 +513,16 @@ function PIDCardTeam({plant, activeAgentIds, forceGrayInsp}){
     <div className="pid-card pid-c-team pid-no-open">
       <div className="pid-h">
         <span>{zh?'数字团队':'Digital Team'}</span>
-        <span className="pid-h-cnt">{plant.agents.length} / {ALL_IDS.length} {zh?'配备':'staffed'}</span>
+        <span className="pid-h-cnt">{assignedCount} / {ALL_IDS.length} {zh?'配备':'staffed'}</span>
       </div>
       <div className="pid-team-list" ref={listRef}>
         {ALL_IDS.map(id=>{
           const ag = _D_ABI[id];
           if(!ag) return null;
           const cat = _D_CAT[ag.cat];
-          const assigned = plant.agents.includes(id) && !(forceGrayInsp && id === 'insp');
-          const isActive = activeAgentIds.has(id);
-          const hasAlert = ag.notif > 0;
+          const assigned = isAssigned(id);
+          const isActive = !hasTeamOverride && activeAgentIds.has(id);
+          const hasAlert = !hasTeamOverride && ag.notif > 0;
           const statusLabel = !assigned ? (zh?'未配备':'N/A')
             : isActive ? (zh?'工作中':'Working')
             : hasAlert ? (zh?'待处理':'Pending')
@@ -528,6 +541,13 @@ function PIDCardTeam({plant, activeAgentIds, forceGrayInsp}){
       </div>
     </div>
   );
+}
+
+function formatStepDate(dateStr) {
+  if (!dateStr) return '';
+  const m = String(dateStr).match(/^\d{4}-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+  if (!m) return dateStr;
+  return `${m[1]}-${m[2]} ${m[3]}:${m[4]}`;
 }
 
 // ── Card 3: Multi-agent collaboration log (auto-scroll)
@@ -553,10 +573,11 @@ function PIDCardLog({scenario, steps}){
           const toName = zh
             ? (to?.short || _NAME_MAP_CN[s.to] || s.to)
             : (to?.en    || _NAME_MAP_EN[s.to] || s.to);
+          const timeLabel = s.date ? formatStepDate(s.date) : `T+${(s.t/1000).toFixed(1)}s`;
           return (
             <div key={i} className="pid-log-ln">
               <div className="pid-log-hd">
-                <span>T+{(s.t/1000).toFixed(1)}s</span>
+                <span>{timeLabel}</span>
                 <b>{fromName}</b>
                 <span>→</span>
                 <b style={{color: s.type==='handoff'?'#a78bfa':'var(--cyan)'}}>{toName}</b>
@@ -571,21 +592,57 @@ function PIDCardLog({scenario, steps}){
   );
 }
 
-// ── Card 5: Full scene (PV grid + agent ring + connections + bubble)
-function PIDCardScene({plant, scenario, stepIdx, cur, activeAgentIds}){
+// ── Card 5: Full scene (PV grid + agent field + flow line + bubble)
+function PIDCardScene({plant, scenario, stepIdx, cur, busyMap}){
   const zh = _useD_Lang() !== 'en';
   const hotCells = useMemo(()=>[16, 17, 28, 29, 64, 76, 88], [plant.id]);
-  const fromPos = cur ? NODE_POS[cur.from] : null;
-  const toPos = cur ? NODE_POS[cur.to] : null;
+
+  const unavailableAgentIds = new Set(getPlantTeamUnavailableIds(plant));
+  const useRobotField = !!(plant?.robotField?.length);
+
+  let posMap = {};
+  let sceneNodes = [];
+
+  if (useRobotField) {
+    plant.robotField.forEach(r => {
+      if (!unavailableAgentIds.has(r.agent)) posMap[r.agent] = { x: r.x, y: r.y };
+    });
+    sceneNodes = plant.robotField
+      .filter(r => !r.anchorOnly && !unavailableAgentIds.has(r.agent))
+      .map(r => ({ id: r.agent, pos: posMap[r.agent] }));
+  } else {
+    sceneNodes = Object.entries(NODE_POS)
+      .filter(([id]) => id !== 'plant')
+      .map(([id, pos]) => {
+        posMap[id] = pos;
+        return { id, pos };
+      })
+      .filter(({ id }) => {
+        const ag = _D_ABI[id];
+        return !ag || plant.agents.includes(id) || id === 'field' || id === 'drone';
+      });
+  }
+
+  const fromPos = cur && posMap[cur.from];
+  const toPos = cur && posMap[cur.to];
+  const lineColor = !cur ? '#22d3ee'
+                  : cur.type === 'action' ? '#fbbf24'
+                  : cur.tag === '安全' ? '#f87171'
+                  : '#22d3ee';
+  const visibleIds = new Set(sceneNodes.map(n => n.id));
+  const speaker = !cur ? null
+    : (busyMap?.[cur.to] && visibleIds.has(cur.to)) ? cur.to
+    : (busyMap?.[cur.from] && visibleIds.has(cur.from)) ? cur.from
+    : null;
+  const speakerPos = speaker ? posMap[speaker] : null;
 
   return (
     <div className="pid-card pid-c-scene pid-no-open">
       <div className="pid-h">
         <span>{zh?'协同图谱':'Collab Graph'}</span>
-        <span className="pid-h-meta">{Object.keys(NODE_POS).length-1} nodes</span>
+        <span className="pid-h-meta">{sceneNodes.length} nodes</span>
       </div>
       <div className="pid-scene-wrap">
-        {/* mini PV grid in center */}
         <div className="pid-scene-pv">
           {Array.from({length:96}).map((_,i)=>{
             const isHot = scenario.id==='A' && hotCells.includes(i) && stepIdx >= 1 && stepIdx < 16;
@@ -594,47 +651,54 @@ function PIDCardScene({plant, scenario, stepIdx, cur, activeAgentIds}){
             return <div key={i} className={`pid-scene-cell ${isHot?'hot':''} ${isFixed?'work':''} ${isInsp?'hot':''}`}/>;
           })}
         </div>
-        {/* connection lines */}
         <svg className="pid-scene-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {Object.keys(NODE_POS).filter(k=>k!=='plant').map(k=>{
-            const p = NODE_POS[k];
-            return <line key={'bb-'+k} x1={p.x} y1={p.y} x2={50} y2={50}
-                         stroke="rgba(120,160,220,0.08)" strokeWidth="0.2" strokeDasharray="0.6 1" vectorEffect="non-scaling-stroke"/>;
-          })}
           {fromPos && toPos && cur.from !== cur.to && (
-            <g>
+            <g key={`ln-${cur.from}-${cur.to}-${cur.t}`}>
               <line x1={fromPos.x} y1={fromPos.y} x2={toPos.x} y2={toPos.y}
-                    stroke="#22d3ee" strokeWidth="0.4" strokeDasharray="1.2 0.8" opacity="0.85" vectorEffect="non-scaling-stroke">
-                <animate attributeName="stroke-dashoffset" from="0" to="-4" dur="0.6s" repeatCount="indefinite"/>
+                    stroke={lineColor} strokeWidth="3"
+                    strokeDasharray="14 8" opacity="0.85"
+                    vectorEffect="non-scaling-stroke"
+                    style={{filter:`drop-shadow(0 0 6px ${lineColor})`}}>
+                <animate attributeName="stroke-dashoffset" from="0" to="-44" dur="0.8s" repeatCount="indefinite"/>
               </line>
-              <circle r="1" fill="#22d3ee" filter="drop-shadow(0 0 4px #22d3ee)">
-                <animateMotion dur="1.4s" repeatCount="indefinite"
-                  path={`M ${fromPos.x} ${fromPos.y} L ${toPos.x} ${toPos.y}`}/>
-              </circle>
             </g>
           )}
         </svg>
-        {/* agent dots around perimeter */}
-        {Object.entries(NODE_POS).filter(([id])=>id!=='plant').map(([id,pos])=>{
+        {fromPos && toPos && cur && cur.from !== cur.to && (
+          <>
+            <style>{`@keyframes pid-particle-${cur.from}-${cur.to}{
+              0%   { left:${fromPos.x}%; top:${fromPos.y}%; opacity:0.2; }
+              10%  { opacity:1; }
+              90%  { opacity:1; }
+              100% { left:${toPos.x}%; top:${toPos.y}%; opacity:0.2; }
+            }`}</style>
+            <div className="pid-particle"
+                 key={`p-${cur.from}-${cur.to}-${cur.t}`}
+                 style={{
+                   background: lineColor,
+                   boxShadow: `0 0 8px ${lineColor}, 0 0 14px ${lineColor}`,
+                   animation: `pid-particle-${cur.from}-${cur.to} 1.4s linear infinite`,
+                 }}/>
+          </>
+        )}
+        {sceneNodes.map(({ id, pos }) => {
           const cat = getCat(id);
-          const isActive = activeAgentIds.has(id);
+          const isActive = !!(busyMap && busyMap[id]);
           const ag = _D_ABI[id];
-          const code = ag?.code || (id==='field' ? 'FLD' : id==='drone' ? 'UAV' : 'XX');
-          const present = !ag || plant.agents.includes(id) || id==='field' || id==='drone';
+          const code = ag?.code || (id === 'field' ? 'FLD' : id === 'drone' ? 'UAV' : 'XX');
           return (
             <div key={id}
-                 className={`pid-scene-node ${isActive?'active':''}`}
-                 style={{left:pos.x+'%', top:pos.y+'%', '--cat-color':cat.color, opacity: present?1:0.35}}>
-              <div className="pid-sn-circle" style={{color:cat.color, background: isActive?'rgba(34,211,238,0.16)':'rgba(6,10,22,0.85)'}}>
+                 className={`pid-scene-node${isActive ? ' active' : ''}`}
+                 style={{ left: pos.x + '%', top: pos.y + '%', '--cat-color': cat.color }}>
+              <div className="pid-sn-circle" style={{ color: cat.color, background: isActive ? 'rgba(34,211,238,0.16)' : 'rgba(6,10,22,0.85)' }}>
                 {code}
               </div>
             </div>
           );
         })}
-        {/* current step mini bubble */}
-        {cur && toPos && (
+        {cur && speakerPos && (
           <div className="pid-scene-bubble"
-               style={{left: toPos.x+'%', top: (toPos.y - 6)+'%'}}>
+               style={{ left: speakerPos.x + '%', top: (speakerPos.y - 6) + '%' }}>
             {cur.tag}
           </div>
         )}

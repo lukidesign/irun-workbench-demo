@@ -953,6 +953,48 @@ function QuickFuncs({focusPlant, totalTokens, busyCount}){
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Excel-backed scrolling sparkline (24 points)
+const SPARK_HOURS = 24;
+const SPARK_TICK_MS = 1200; // 比原先 700ms 略慢
+
+function _normHourlySeries(raw) {
+  if (!raw?.length) return Array.from({ length: SPARK_HOURS }, () => 0.03);
+  const maxV = Math.max(...raw, 1);
+  const norm = raw.map(v => Math.max(0.03, v / maxV));
+  while (norm.length < SPARK_HOURS) norm.push(norm[norm.length - 1] ?? 0.03);
+  return norm.slice(0, SPARK_HOURS);
+}
+
+/** token消耗曲线（小时）：00:00 ~ 当前小时（含），按 slice 归一化 */
+function _tokenHourlySparkToNow(agentId, hourIdx, minuteFrac) {
+  const hourly = window.IRUN_AGENT_TOKEN?.byAgentId?.[agentId]?.tokenHourly;
+  if (!hourly?.length) return [0.03];
+  const h = Math.max(0, Math.min(SPARK_HOURS - 1, Math.floor(hourIdx)));
+  const frac = Math.max(0, Math.min(1, minuteFrac));
+  const slice = hourly.slice(0, h + 1).map(v => Number(v) || 0);
+  if (frac > 0 && slice.length) {
+    const cur = hourly[h] ?? 0;
+    const prev = h > 0 ? (hourly[h - 1] ?? 0) : 0;
+    slice[slice.length - 1] = h > 0 ? prev + (cur - prev) * frac : cur * frac;
+  }
+  const maxV = Math.max(...slice, 1);
+  return slice.map(v => Math.max(0.03, v / maxV));
+}
+
+function _excelCallsShape(agentId) {
+  const rec = window.IRUN_AGENT_TOKEN?.byAgentId?.[agentId];
+  return _normHourlySeries(rec?.callsCumulative);
+}
+
+function _tickScrollingSpark(shape, prev, agentIndex) {
+  const hSim = ((Date.now() / 1000) / 5 + agentIndex * 0.7) % SPARK_HOURS;
+  const base = shape[Math.floor(hSim)] ?? shape[shape.length - 1] ?? 0.5;
+  const noise = (Math.random() - 0.5) * 0.1;
+  const last = prev[prev.length - 1];
+  const next = Math.max(0.03, Math.min(1, base * 0.7 + last * 0.2 + noise + 0.05));
+  return [...prev.slice(1), next];
+}
+
 // Agent modal — drill into a single agent's working pane
 function AgentModal({agentId, onClose, busyMap, onChat}){
   if(!agentId) return null;
@@ -960,6 +1002,26 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
   const a = _ABI[agentId];
   const cat = _CATS[a.cat];
   const isBusy = busyMap?.[agentId];
+
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const hourIdx = now.getHours();
+  const snap = React.useMemo(
+    () => window.IRUN_AGENT_TOKEN?.getSnapshot(agentId, hourIdx) ?? null,
+    [agentId, hourIdx]
+  );
+  const [trendSpark, setTrendSpark] = useState(() => _excelCallsShape(agentId));
+  useEffect(() => { setTrendSpark(_excelCallsShape(agentId)); }, [agentId, hourIdx]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTrendSpark(prev => _tickScrollingSpark(_excelCallsShape(agentId), prev, 0));
+    }, SPARK_TICK_MS);
+    return () => clearInterval(id);
+  }, [agentId]);
+  const tokenBarLabels = { reasoning: zh ? '推理' : 'Reason', tool: zh ? '工具' : 'Tools', retrieval: zh ? '检索' : 'Retrieval' };
 
   // synthetic workflow log
   const log = useMemo(()=>{
@@ -983,8 +1045,6 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
     ];
   },[agentId, zh]);
 
-  // sparkline values
-  const spark = useMemo(()=>Array.from({length:24},()=>Math.random()*0.7+0.2),[agentId]);
   return (
     <div className="modal-bd" onClick={onClose}>
       <div className="modal corners" onClick={e=>e.stopPropagation()} style={{'--cat-color':cat.color}}>
@@ -1018,14 +1078,22 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
             <div className="section" style={{marginTop:18}}>
               <h3>{zh?'今日工作统计':"Today's Stats"}</h3>
               <div className="stat-grid">
-                <div className="c"><div className="l">{zh?'调用次数':'Calls'}</div><div className="v mono">{a.metrics.todayCalls}</div></div>
-                <div className="c"><div className="l">Token</div><div className="v mono">{a.metrics.tokens}</div></div>
-                <div className="c"><div className="l">{zh?'成功率':'Success'}</div><div className="v mono">{a.metrics.success}%</div></div>
+                <div className="c"><div className="l">{zh?'调用次数':'Calls'}</div><div className="v mono">{snap?.calls ?? a.metrics.todayCalls}</div></div>
+                <div className="c"><div className="l">Token</div><div className="v mono">{snap?.tokensText ?? a.metrics.tokens}</div></div>
+                <div className="c"><div className="l">{zh?'成功率':'Success'}</div><div className="v mono">{snap?.successRateText ?? a.metrics.success}%</div></div>
               </div>
               <div className="token-bars">
-                <div className="row"><span className="n">{zh?'推理':'Reason'}</span><div className="b"><i style={{width:'72%'}}/></div><span className="v mono">17.4K</span></div>
-                <div className="row"><span className="n">{zh?'工具':'Tools'}</span><div className="b"><i style={{width:'34%'}}/></div><span className="v mono">8.1K</span></div>
-                <div className="row"><span className="n">{zh?'检索':'Retrieval'}</span><div className="b"><i style={{width:'52%'}}/></div><span className="v mono">12.3K</span></div>
+                {(snap?.tokenBars ?? [
+                  { key: 'reasoning', pct: 72, text: '17.4K' },
+                  { key: 'tool', pct: 34, text: '8.1K' },
+                  { key: 'retrieval', pct: 52, text: '12.3K' },
+                ]).map(bar => (
+                  <div key={bar.key} className="row">
+                    <span className="n">{tokenBarLabels[bar.key] ?? bar.key}</span>
+                    <div className="b"><i style={{width: `${bar.pct}%`}}/></div>
+                    <span className="v mono">{bar.text}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1049,11 +1117,13 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
                 </defs>
                 <polyline
                   fill="none" stroke={cat.color} strokeWidth="1.5"
-                  points={spark.map((v,i)=>`${i*(240/(spark.length-1))},${80-v*70}`).join(' ')}
+                  points={trendSpark.map((v,i)=>`${i*(240/(SPARK_HOURS-1))},${80-v*70}`).join(' ')}
+                  style={{transition:'all .6s ease-out'}}
                 />
                 <polygon
                   fill="url(#g1)"
-                  points={`0,80 ${spark.map((v,i)=>`${i*(240/(spark.length-1))},${80-v*70}`).join(' ')} 240,80`}
+                  points={`0,80 ${trendSpark.map((v,i)=>`${i*(240/(SPARK_HOURS-1))},${80-v*70}`).join(' ')} 240,80`}
+                  style={{transition:'all .6s ease-out'}}
                 />
                 {[0,20,40,60,80].map(y=><line key={y} x1="0" x2="240" y1={y} y2={y} stroke="rgba(120,160,220,0.05)"/>)}
               </svg>
@@ -1108,74 +1178,28 @@ function ModeStrip({mode, onChange}){
 // Agent Token Analytics Panel (replaces AgentDock in map2 mode)
 function AgentTokenPanel({ busyMap, onOpen }) {
   const l = useLang(); const zh = l !== 'en';
-  const N = 24; // points per sparkline
-
-  // Per-agent 24h shape functions → distinct working rhythm per agent.
-  // Each returns a relative intensity in [0, 1] for hour h ∈ [0, 23].
-  const SHAPES = {
-    // 告警:7×24 高基线监控,夜间也有活动,小幅波动
-    alert: h => 0.58 + 0.22 * Math.sin((h - 2) / 24 * Math.PI * 2) + 0.08 * Math.cos(h / 3),
-    // 工单:7-21 单大峰,午后最高
-    order: h => (h >= 7 && h <= 21) ? 0.32 + 0.6 * Math.sin((h - 7) / 14 * Math.PI) : 0.1,
-    // 排程:早高峰(8h) + 傍晚峰(17h) 双峰
-    sched: h => 0.1 + 0.55 * Math.exp(-((h - 8) ** 2) / 8) + 0.78 * Math.exp(-((h - 17) ** 2) / 10),
-    // 预警:白天宽峰
-    warn:  h => (h >= 6 && h <= 20) ? 0.26 + 0.62 * Math.sin((h - 6) / 14 * Math.PI) : 0.1,
-    // 巡检:正午锐峰(无人机白天作业)
-    insp:  h => Math.max(0.05, 0.92 * Math.exp(-((h - 12) ** 2) / 16)),
-    // 诊断:白天主峰 + 上午次峰
-    diag:  h => 0.16 + 0.55 * Math.max(0, Math.sin((h - 6) / 12 * Math.PI)) + 0.22 * Math.max(0, Math.sin((h - 9) / 4 * Math.PI - 0.4)),
-    // 安全:全天偏稳,白天小幅抬升
-    safe:  h => (h >= 7 && h <= 19) ? 0.4 + 0.25 * Math.sin((h - 7) / 12 * Math.PI) : 0.24,
-    // 光伏助手:平稳波浪,昼夜差不大
-    pv:    h => 0.46 + 0.18 * Math.sin((h - 4) / 24 * Math.PI * 2) + 0.12 * Math.sin(h / 2.5),
-    // 问数:9-18 工作时段聚集
-    query: h => (h >= 9 && h <= 18) ? 0.28 + 0.62 * Math.sin((h - 9) / 9 * Math.PI) : 0.07,
-    // 运营:平稳缓变,白天微高
-    ops:   h => 0.38 + 0.22 * Math.cos((h - 11) / 12 * Math.PI),
-  };
-  function shapeFor(id, h) {
-    const f = SHAPES[id] || SHAPES.ops;
-    return Math.max(0.04, Math.min(1, f(h)));
-  }
-
-  // Each agent's token K-value drives its absolute curve height.
-  const TOK_VALS = _AGENTS.map(a => parseFloat(a.metrics.tokens) || 0);
-  const GLOBAL_MAX_TOK = Math.max(...TOK_VALS, 1);
-
-  // Deterministic seeded RNG → so each agent starts with a stable curve
-  function seededRng(seed){
-    let s = seed >>> 0;
-    return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-  }
-  function genSpark(agent, seed) {
-    const rng = seededRng(seed);
-    const pts = [];
-    for (let h = 0; h < N; h++) {
-      const base = shapeFor(agent.id, h);
-      pts.push(Math.max(0.03, Math.min(1, base + (rng() - 0.5) * 0.08)));
-    }
-    return pts;
-  }
-
-  // Each agent owns its own live spark array, evolving over time
-  const [sparks, setSparks] = useState(() => _AGENTS.map((a, i) => genSpark(a, i * 31337 + 7)));
-
+  const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => {
-      setSparks(prev => prev.map((arr, i) => {
-        const a = _AGENTS[i];
-        // simulated clock hour advances slowly; each agent samples its own shape
-        const hSim = ((Date.now() / 1000) / 3 + i * 0.7) % 24;
-        const shape = shapeFor(a.id, hSim);
-        const noise = (Math.random() - 0.5) * 0.1;
-        const last = arr[arr.length - 1];
-        const next = Math.max(0.03, Math.min(1, shape * 0.7 + last * 0.2 + noise + 0.05));
-        return [...arr.slice(1), next];
-      }));
-    }, 700);
+    const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
+  const hourIdx = now.getHours();
+  const minuteFrac = now.getMinutes() / 60;
+  const getSnap = window.IRUN_AGENT_TOKEN?.getSnapshot;
+
+  const tokenSparks = React.useMemo(
+    () => _AGENTS.map(a => _tokenHourlySparkToNow(a.id, hourIdx, minuteFrac)),
+    [hourIdx, minuteFrac]
+  );
+
+  const agentSnaps = React.useMemo(
+    () => _AGENTS.map(a => (getSnap ? getSnap(a.id, hourIdx) : null)),
+    [hourIdx, getSnap]
+  );
+  const GLOBAL_MAX_TOK = Math.max(
+    ...agentSnaps.map((s, i) => s?.tokenTotal ?? (parseFloat(String(_AGENTS[i].metrics.tokens)) || 0)),
+    1
+  );
 
   const W = 100, H = 32;
 
@@ -1192,18 +1216,17 @@ function AgentTokenPanel({ busyMap, onOpen }) {
         <div className="token-track">
           {list.map((a, dupIdx) => {
             const i = dupIdx % _AGENTS.length;
+            const snap = agentSnaps[i];
             const cat = _CATS[a.cat];
             const busy = busyMap?.[a.id];
-            const spark = sparks[i];
-            const mx = Math.max(...spark);
-            const peakH = spark.indexOf(mx);
+            const spark = tokenSparks[i] || [0.03];
+            const peakH = snap?.peakHour;
             const color = busy ? '#22d3ee' : cat.color;
-            // Curve height ∝ this agent's token volume vs the global max.
-            // Floor at 0.18 so the tiniest agent is still visible.
-            const tokVal = parseFloat(a.metrics.tokens) || 0;
+            const tokVal = snap?.tokenTotal ?? 0;
             const agentScale = Math.max(0.18, tokVal / GLOBAL_MAX_TOK);
+            const xDenom = Math.max(spark.length - 1, 1);
             const polyPts = spark.map((v, idx) =>
-              `${(idx / (N-1)) * W},${H - 2 - v * agentScale * (H - 5)}`
+              `${(idx / xDenom) * W},${H - 2 - v * agentScale * (H - 5)}`
             ).join(' ');
             const areaPts = `0,${H} ${polyPts} ${W},${H}`;
             return (
@@ -1217,15 +1240,15 @@ function AgentTokenPanel({ busyMap, onOpen }) {
                     <span className="tc-name">{zh ? a.short : a.en}</span>
                     <span className={`tc-st ${busy ? 'work' : 'idle'}`}>{zh?'● 运行':'● Active'}</span>
                   </div>
-                  <span className="tc-tok">{a.metrics.tokens}</span>
+                  <span className="tc-tok">{snap?.tokensText ?? a.metrics.tokens}</span>
                 </div>
                 <svg className="tc-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
                   <polygon points={areaPts} fill={color} fillOpacity="0.13"/>
                   <polyline points={polyPts} fill="none" stroke={color} strokeWidth="0.75" strokeLinejoin="round" strokeLinecap="round"/>
                 </svg>
                 <div className="tc-foot">
-                  <span>{a.metrics.todayCalls} calls</span>
-                  <span>{zh?'峰':'Peak'} {peakH}:00 · {a.metrics.success}%</span>
+                  <span>{snap?.calls ?? a.metrics.todayCalls} calls</span>
+                  <span>{zh?'峰':'Peak'} {peakH != null ? peakH : '--'}:00 · {snap?.successRateText ?? a.metrics.success}%</span>
                 </div>
               </div>
             );
@@ -1649,13 +1672,23 @@ function DispatchedRobots({robots, onRobotDone}){
 // Renders a fleet of static RobotAvatars at plant.robotField positions.
 // Active agents (busyMap hit) glow + lift. Used in img2 when a plant
 // provides robotField data; otherwise the single walking PlantRobot is used.
+const getDemoPlantTeamUnavailableIds = (id) => window.IRUN?.getDemoPlantTeamUnavailableIds?.(id) || [];
 function PlantAgentField({plant, busyMap, cur}){
   if (!plant?.robotField?.length) return null;
-  // The "speaker" of the current step bubble = the actor (from), fallback to (to)
-  const speaker = cur ? (busyMap && busyMap[cur.from] ? cur.from : (busyMap && busyMap[cur.to] ? cur.to : null)) : null;
-  // Build position map for line endpoints
+  const unavailableAgentIds = new Set(getDemoPlantTeamUnavailableIds(plant?.id));
+  const visibleRobots = plant.robotField.filter(r => !r.anchorOnly && !unavailableAgentIds.has(r.agent));
+  if (!visibleRobots.length) return null;
+  // Bubble on a visible robot: prefer handoff target (e.g. drone→insp shows on insp)
+  const visibleIds = new Set(visibleRobots.map(r => r.agent));
+  const speaker = !cur ? null
+    : (busyMap?.[cur.to] && visibleIds.has(cur.to)) ? cur.to
+    : (busyMap?.[cur.from] && visibleIds.has(cur.from)) ? cur.from
+    : null;
+  // Build position map for line endpoints (incl. anchorOnly e.g. drone — lines only, no tile)
   const posMap = {};
-  plant.robotField.forEach(r => { posMap[r.agent] = {x: r.x, y: r.y}; });
+  plant.robotField.forEach(r => {
+    if (!unavailableAgentIds.has(r.agent)) posMap[r.agent] = {x: r.x, y: r.y};
+  });
   const fromPos = cur && posMap[cur.from];
   const toPos = cur && posMap[cur.to];
   const lineColor = !cur ? '#22d3ee'
@@ -1696,24 +1729,14 @@ function PlantAgentField({plant, busyMap, cur}){
                }}/>
         </>
       )}
-      {plant.robotField.map((r, i) => {
-        if (r.agent === 'drone') {
-          // Drone flies along a serpentine inspection route over the PV arrays.
-          // No inline left/top — the @keyframes paf-drone-fly animation drives motion.
-          // return (
-          //   <div key={i} className="paf-drone paf-drone-flying">
-          //     <img src="wrj001.png" alt=""/>
-          //     <div className="paf-badge paf-badge-drone">UAV</div>
-          //   </div>
-          // );
-        }
+      {visibleRobots.map((r, i) => {
         const ag = _ABI[r.agent];
         if (!ag) return null;
         const active = !!(busyMap && busyMap[r.agent]);
         const showBubble = active && cur && (r.agent === speaker);
         const tagClass = cur?.tag ? ` tag-${cur.type==='action'?'mid':(cur.tag==='安全'?'high':'low')}` : '';
         return (
-          <div key={i}
+          <div key={r.agent}
                className={`paf-robot${active?' active':''}`}
                style={{left:`${r.x}%`, top:`${r.y}%`, animationDelay:`${i*0.3}s`}}>
             {showBubble && (
@@ -1909,6 +1932,9 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
   const [hoverId, setHoverId] = useState(null);
   const [hoverTop, setHoverTop] = useState(0);
   const railRef = useRef(null);
+  const demoProfile = getDemoPlantProfile(focusPlant?.id);
+  const unavailableAgentIds = new Set(getDemoPlantTeamUnavailableIds(focusPlant?.id));
+  const hasTeamOverride = unavailableAgentIds.size > 0;
 
   const handleEnter = (id, e) => {
     if (!tooltipEnabled) return;
@@ -1929,8 +1955,8 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
       <div className="agents-rail-list">
         {_AGENTS.map(a=>{
           const cat = _CATS[a.cat];
-          const isOff = focusPlant && !focusPlant.agents.includes(a.id);
-          const isInspDemoOff = !!getDemoPlantProfile(focusPlant?.id)?.grayInspInTeam && a.id === 'insp';
+          const isOff = focusPlant && (hasTeamOverride ? unavailableAgentIds.has(a.id) : !focusPlant.agents.includes(a.id));
+          const isInspDemoOff = !!demoProfile?.grayInspInTeam && a.id === 'insp';
           const isDarkLocked = theme === 'dark' && !DARK_RAIL_AGENTS.has(a.id);
           const disabled = isOff || isDarkLocked || isInspDemoOff;
           const busy = busyMap?.[a.id];

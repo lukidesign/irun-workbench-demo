@@ -101,12 +101,14 @@ const PLANTS = [
     agents: ['ops','warn','alert','diag','order','sched','insp','query'],
     defaultScenarioIdx: 1,
     robotField: [
-      { agent:'insp',  x:53, y:44 },
-      { agent:'drone', x:65, y:33 },
-      { agent:'diag',  x:46, y:51 },
-      { agent:'order', x:38, y:24 },
-      { agent:'sched', x:50, y:18 },
       { agent:'ops',   x:70, y:28 },
+      { agent:'sched', x:50, y:18 },
+      { agent:'order', x:38, y:24 },
+      { agent:'query', x:24, y:36 },
+      { agent:'insp',  x:53, y:44 },
+      { agent:'pv',    x:66, y:58 },
+      { agent:'safe',  x:80, y:42 },
+      { agent:'drone', x:65, y:33, anchorOnly: true },
     ],
   },
 
@@ -183,20 +185,30 @@ const SCENARIO_A = {
   ],
 };
 
-// Scenario B: 巡检 → 无人机 → 图像诊断 → 工单 → 排程
+// Scenario B: Penang 季度巡检 · 无人机 · 消缺闭环（t 均匀间隔 ~1.4s/步，便于场域虚线动画）
 const SCENARIO_B = {
   id: 'B', title: '场景 B · 无人机巡检 · 图像驱动', enTitle: 'Scenario B · UAV Inspection · Vision-Driven',
   steps: [
-    { t: 0,    from: 'insp',  to: 'insp',   type: 'action',  text: '生成日巡检计划 · 覆盖 18 个方阵',                 en: 'Daily inspection plan · covering 18 arrays',                 tag: '巡检',     entag: 'Inspect' },
-    { t: 1400, from: 'insp',  to: 'drone',  type: 'handoff', text: '下发任务 → 无人机 UAV-03',                        en: 'Dispatch task → UAV-03',                                     tag: '终端',     entag: 'Edge' },
-    { t: 3000, from: 'drone', to: 'insp',   type: 'event',   text: '回传图像 1284 张 · 红外+可见光',                  en: '1284 images returned · IR + visible',                        tag: '采集',     entag: 'Capture' },
-    { t: 4400, from: 'insp',  to: 'insp',   type: 'think',   text: '图像识别：发现 4 处热斑 · 2 处二极管异常',         en: 'Vision: 4 hot-spots · 2 diode anomalies',                    tag: '识别',     entag: 'Detect' },
-    { t: 6000, from: 'insp',  to: 'diag',   type: 'handoff', text: '提交缺陷清单 → 请复核',                            en: 'Submit defect list → please review',                         tag: '协同',     entag: 'Handoff' },
-    { t: 7200, from: 'diag',  to: 'order',  type: 'handoff', text: '确认 5 项缺陷需现场处置',                          en: 'Confirmed 5 defects need on-site action',                    tag: '协同',     entag: 'Handoff' },
-    { t: 8400, from: 'order', to: 'order',  type: 'action',  text: '批量创建工单 ×5 · 关联缺陷影像',                  en: 'Bulk-create 5 tickets · linked defect imagery',              tag: '工单',     entag: 'Ticket' },
-    { t: 9800, from: 'order', to: 'sched',  type: 'handoff', text: '请求批量排程 → 同一行程合并',                     en: 'Request bulk scheduling → merge into one trip',              tag: '协同',     entag: 'Handoff' },
-    { t:11200, from: 'sched', to: 'field',  type: 'action',  text: '生成最优路径：1 人 · 1 车 · 142 min',              en: 'Optimal route: 1 person · 1 vehicle · 142 min',              tag: '排程',     entag: 'Schedule' },
-    { t:13000, from: 'order', to: 'ops',    type: 'handoff', text: '巡检闭环 → 5 项任务进入执行队列',                 en: 'Inspection closed → 5 tasks queued for execution',           tag: '归档',     entag: 'Archive' },
+    { t: 0, date: '2026-05-28 02:00:00', from: 'ops',   to: 'ops',   type: 'action',  text: '合同周期巡检到期提醒 + 设备健康度评估 — 距上次巡检满 3 个月，健康度 87.0 分（良好），建议如期巡检。', en: 'Quarterly inspection due + health assessment — 3 months since last round, health 87.0 (good), proceed as scheduled.', tag: '运营', entag: 'Ops' },
+    { t: 1400, date: '2026-05-28 02:01:06', from: 'ops',   to: 'query', type: 'handoff', text: '调取历史巡检档案 — 上季度 11 处缺陷已闭环，遗留 2 处 PID 观察项需本次复核。', en: 'Pull inspection history — 11 defects closed last quarter, 2 legacy PID items to recheck.', tag: '问数', entag: 'Data' },
+    { t: 2800, date: '2026-05-28 02:05:00', from: 'query', to: 'order', type: 'handoff', text: '生成季度巡检计划（草案） — 全站热成像 + 遗留项复核，待天气/风浪窗口确认。', en: 'Draft quarterly inspection plan — full-site thermography + legacy recheck, pending weather/water window.', tag: '工单', entag: 'Ticket' },
+    { t: 4200, date: '2026-05-28 02:08:00', from: 'order', to: 'sched', type: 'handoff', text: '天气与水域窗口查询 — 05-30 晴、辐照达标、低风低浪，为最佳作业窗口。', en: 'Weather & water-window query — 05-30 sunny, irradiance OK, low wind/waves, best window.', tag: '排程', entag: 'Schedule' },
+    { t: 5600, date: '2026-05-29 08:00:00', from: 'order', to: 'drone', type: 'handoff', text: '创建无人机巡检任务 INSP-2026-0530-PNG-F01 — 锁定时间、范围、飞手，推送至无人机调度。', en: 'Create drone task INSP-2026-0530-PNG-F01 — time, scope, pilot locked, pushed to UAV dispatch.', tag: '工单', entag: 'Ticket' },
+    { t: 7000, date: '2026-05-30 10:25:00', from: 'drone', to: 'drone', type: 'action',  text: '接收任务，完成起飞前自检 — RTK 固定、电量满格、航线加载完成。', en: 'Task received, pre-flight check OK — RTK fixed, full battery, route loaded.', tag: '终端', entag: 'Edge' },
+    { t: 8400, date: '2026-05-30 10:30:00', from: 'drone', to: 'drone', type: 'event',   text: '巡检工作中 — 自动航线飞行，红外/可见光双光实时回传。', en: 'Inspecting — auto route, IR + visible live feed.', tag: '采集', entag: 'Capture' },
+    { t: 9800, date: '2026-05-30 13:50:00', from: 'drone', to: 'insp',  type: 'handoff', text: '巡检完成，图像回传 — 飞行 3h20min，回传 1,940 张，进入 AI 分析。', en: 'Inspection done, images uploaded — 3h20m flight, 1,940 images, entering AI analysis.', tag: '协同', entag: 'Handoff' },
+    { t: 11200, date: '2026-05-30 13:55:00', from: 'insp',  to: 'insp',  type: 'think',   text: '图像回传分析中 — 红外测温 + AI 缺陷识别 + 资产定位匹配。', en: 'Analyzing images — IR thermography + AI defect ID + asset geolocation.', tag: '识别', entag: 'Detect' },
+    { t: 12600, date: '2026-05-30 14:25:00', from: 'insp',  to: 'insp',  type: 'think',   text: '给出缺陷清单：共 18 处（Class3 5 / Class2 7 / Class1 6），缺陷率 0.37%。', en: 'Defect list: 18 total (Class3×5 / Class2×7 / Class1×6), defect rate 0.37%.', tag: '识别', entag: 'Detect' },
+    { t: 14000, date: '2026-05-30 14:55:00', from: 'insp',  to: 'order', type: 'handoff', text: '巡检报告生成完成 — RPT-A-PNG-2026-0530-001，已归档并推送运营/工单。', en: 'Inspection report RPT-A-PNG-2026-0530-001 generated, archived, sent to Ops/Ticket.', tag: '巡检', entag: 'Inspect' },
+    { t: 15400, date: '2026-05-30 15:00:00', from: 'order', to: 'sched', type: 'handoff', text: '将本电站 18 处缺陷归集，创建 1 张电站级消缺工单 — 并行调用排程、安全智能体。', en: '18 defects rolled into 1 site fix ticket — calling Schedule & Safety in parallel.', tag: '协同', entag: 'Handoff' },
+    { t: 16800, date: '2026-05-30 15:06:00', from: 'sched', to: 'sched', type: 'action',  text: '人员/技能/天气匹配完成 — 按缺陷紧急度安排上站，含工作艇路径规划。', en: 'Staff/skill/weather matched — site visits by urgency, incl. work-boat routing.', tag: '排程', entag: 'Schedule' },
+    { t: 18200, date: '2026-05-30 15:14:00', from: 'sched', to: 'safe',  type: 'handoff', text: '逐任务项作业风险与工具校验 — 整单风险：高（直流高压 + 水上作业/溺水）。', en: 'Per-task risk & tool check — ticket risk: high (DC HV + water work/drowning).', tag: '安全', entag: 'Safety' },
+    { t: 19600, date: '2026-05-30 15:25:00', from: 'safe',  to: 'order', type: 'handoff', text: '工单 WO-2026-0530-PNG-001 创建完成 — 5 个任务项，关联巡检报告，已推送张工、李工、船操员、清洗班组，并同步排程看板与巡检智能体。', en: 'Ticket WO-2026-0530-PNG-001 created — 5 tasks, report linked, pushed to crews & Inspect agent.', tag: '工单', entag: 'Ticket' },
+    { t: 21000, date: '2026-05-31 09:20:00', from: 'order', to: 'pv',    type: 'handoff', text: '张工@光伏：热斑组件更换、旁路二极管判定、接头腐蚀/组串离线、PID 治理。', en: 'Zhang @PV-Assist: hot-spot swap, bypass diode check, connector corrosion/offline string, PID treatment.', tag: '知识', entag: 'Knowledge' },
+    { t: 22400, date: '2026-05-31 15:40:00', from: 'pv',    to: 'order', type: 'handoff', text: '回单提交 — Class3 全部消缺，接头防腐处理，PID 进入修复期。', en: 'Field report filed — all Class3 cleared, connector anti-corrosion, PID in recovery.', tag: '工单', entag: 'Ticket' },
+    { t: 23800, date: '2026-06-01 11:00:00', from: 'order', to: 'insp',  type: 'handoff', text: '同步工单作业结果至巡检智能体 — 缺陷台账状态更新，闭环 / 挂起标记更新。', en: 'Sync ticket results to Inspect agent — defect ledger & closure flags updated.', tag: '协同', entag: 'Handoff' },
+    { t: 25200, date: '2026-06-02 01:00:00', from: 'insp',  to: 'ops',   type: 'handoff', text: '消缺后电站 KPI / 健康度复盘 — PR 回升、健康度提升至 90.2 分。', en: 'Post-fix KPI / health review — PR recovered, health up to 90.2.', tag: '运营', entag: 'Ops' },
+    { t: 26600, date: '2026-06-02 02:00:00', from: 'ops',   to: 'order', type: 'handoff', text: '更新下一次巡检计划 — 维持季度节奏（下次 2026-08-30 前），按缺陷趋势动态加强。', en: 'Update next inspection plan — quarterly cadence (by 2026-08-30), strengthen per defect trend.', tag: '归档', entag: 'Archive' },
   ],
 };
 
@@ -1060,11 +1072,15 @@ const DEMO_PLANT_PROFILES = {
     scenarioIdx: 1,
     timelineZh: '无人机巡检 · 图像驱动',
     timelineEn: 'UAV Inspection · Vision-Driven',
+    teamUnavailableAgentIds: ['alert', 'diag', 'warn'],
   },
 };
 function getDemoPlantProfile(id) {
   if (id == null) return null;
   return DEMO_PLANT_PROFILES[String(id)] || null;
+}
+function getDemoPlantTeamUnavailableIds(id) {
+  return getDemoPlantProfile(id)?.teamUnavailableAgentIds || [];
 }
 
 window.IRUN = {
@@ -1072,7 +1088,7 @@ window.IRUN = {
   TENANTS, PLANTS, AGGREGATE, aggregateOf,
   SCENARIOS, SCENARIO_A, SCENARIO_B,
   DISPATCH_HIDDEN_PLANT_IDS, isDispatchHiddenPlant,
-  DEMO_PLANT_PROFILES, getDemoPlantProfile,
+  DEMO_PLANT_PROFILES, getDemoPlantProfile, getDemoPlantTeamUnavailableIds,
   GLOBAL_EVENT_TEMPLATES, QUICK_PROMPTS,
   PV_EXPO_QA,
   PV_EXPO_QUERY_QA,
