@@ -2,6 +2,9 @@
 const { useState: _useState, useEffect: _useEffect, useRef: _useRef, useMemo: _useMemo } = React;
 const useState = _useState, useEffect = _useEffect, useRef = _useRef, useMemo = _useMemo;
 const { AGENT_BY_ID: _D_ABI, AGENT_CATEGORIES: _D_CAT, SCENARIOS: _SCENARIOS, AGENTS: _D_AGENTS } = window.IRUN;
+function getPlantDemoProfile(plant) {
+  return window.IRUN?.getDemoPlantProfile?.(plant?.id) || null;
+}
 const { LangCtx: _D_LANG } = window.IRUN_UI || {};
 const _useD_Lang = () => React.useContext(_D_LANG || React.createContext('zh'));
 
@@ -38,7 +41,8 @@ function getCat(id){
 function useScenarioStepping({scenarioIdx, plantId, mode, onStep, onScenarioChange}){
   const [stepIdx, setStepIdx] = useState(0);
   const timersRef = useRef([]);
-  const scenario = _SCENARIOS[scenarioIdx];
+  const scenario = _SCENARIOS[scenarioIdx] || _SCENARIOS[0] || { id: '-', title: '', steps: [] };
+  const steps = scenario.steps || [];
 
   useEffect(()=>{
     if(!plantId) return;
@@ -46,9 +50,11 @@ function useScenarioStepping({scenarioIdx, plantId, mode, onStep, onScenarioChan
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
     setStepIdx(0);
-    onStep?.(scenario.steps[0], 0, scenario);
+    if(!steps.length) return;
 
-    scenario.steps.forEach((s,i)=>{
+    onStep?.(steps[0], 0, scenario);
+
+    steps.forEach((s,i)=>{
       if(i===0) return;
       const id = setTimeout(()=>{
         setStepIdx(i);
@@ -56,16 +62,17 @@ function useScenarioStepping({scenarioIdx, plantId, mode, onStep, onScenarioChan
       }, s.t);
       timersRef.current.push(id);
     });
-    const last = scenario.steps[scenario.steps.length-1].t;
+    const last = steps[steps.length - 1].t;
     const loopId = setTimeout(()=>{
-      onScenarioChange?.((scenarioIdx+1) % _SCENARIOS.length);
+      if (window.IRUN?.getDemoPlantProfile?.(plantId)) return;
+      if(_SCENARIOS.length > 1) onScenarioChange?.((scenarioIdx+1) % _SCENARIOS.length);
     }, last + 4000);
     timersRef.current.push(loopId);
 
     return ()=> timersRef.current.forEach(clearTimeout);
   },[scenarioIdx, plantId, mode]);
 
-  const cur = scenario.steps[stepIdx];
+  const cur = steps[stepIdx] || null;
   return { stepIdx, cur, scenario };
 }
 
@@ -97,8 +104,11 @@ function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx,
   }
 
   if(!plant) return null;
-  const totalDur = scenario.steps[scenario.steps.length-1].t + 1500;
-  const progress = Math.min(100, (cur?.t || 0) / totalDur * 100);
+  const demoProfile = getPlantDemoProfile(plant);
+  const steps = scenario.steps || [];
+  const lastT = steps.length ? steps[steps.length - 1].t : 0;
+  const totalDur = lastT + 1500;
+  const progress = steps.length ? Math.min(100, (cur?.t || 0) / totalDur * 100) : 0;
 
   return (
     <div className="detail-overlay">
@@ -109,9 +119,12 @@ function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx,
             <b>{zh ? plant.name : (plant.enName || plant.name)}</b>
             <small>{zh ? plant.region : (plant.enRegion || plant.region)} · {plant.capacity} MW · {zh?'实时功率':'Live'} {plant.power} MW · {zh?'智能体':'Agents'} {plant.agents.length}/10</small>
           </div>
-          <div className="mode-tabs hd-center">
+          <div className={`mode-tabs hd-center${demoProfile ? ' mode-tabs-locked' : ''}`}>
             <button className={mode==='auto'?'on':''} onClick={()=>onModeChange('auto')}>{zh?'托管模式':'Auto'}</button>
-            <button className={mode==='command'?'on':''} onClick={()=>onModeChange('command')}>{zh?'指挥模式':'Command'}</button>
+            <button
+              className={mode==='command'?'on':''}
+              disabled={!!demoProfile}
+              onClick={()=>onModeChange('command')}>{zh?'指挥模式':'Command'}</button>
           </div>
           <div className="stats">
             <div className="s"><span className="l">{zh?'日发电':"Today's Gen"}</span><span className="v mono">{plant.gen}<small style={{color:'var(--text-mute)',fontSize:10,marginLeft:4}}>MWh</small></span></div>
@@ -131,10 +144,10 @@ function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx,
           <div className="detail-left">
             <DigitalTeam plant={plant} activeAgentIds={(() => {
               const s = new Set();
-              scenario.steps.slice(0, stepIdx+1).slice(-3).forEach(st => { s.add(st.from); s.add(st.to); });
+              steps.slice(0, stepIdx+1).slice(-3).forEach(st => { s.add(st.from); s.add(st.to); });
               return s;
             })()}/>
-            <SceneLog scenario={scenario} steps={scenario.steps.slice(0, stepIdx+1)} plant={plant}/>
+            <SceneLog scenario={scenario} steps={steps.slice(0, stepIdx+1)} plant={plant}/>
           </div>
           <div className="detail-right">
             <SceneStage plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur} mode={mode}/>
@@ -142,23 +155,27 @@ function PlantDetail({plant, onClose, scenario, stepIdx, cur, mode, scenarioIdx,
         </div>
 
         <div className="scenario-timeline">
-          <div className="lbl">{scenario.title}</div>
+          <div className="lbl">{demoProfile
+            ? (zh ? demoProfile.timelineZh : demoProfile.timelineEn)
+            : scenario.title}</div>
           <div className="track"><i style={{width: progress+'%'}}/></div>
           <div className="step-name">
             {cur && (<>
-              <span style={{color:'var(--cyan)'}}>step {stepIdx+1}/{scenario.steps.length}</span>
+              <span style={{color:'var(--cyan)'}}>step {steps.length ? stepIdx+1 : 0}/{steps.length}</span>
               &nbsp;·&nbsp;
               {cur.tag}
             </>)}
           </div>
-          <div style={{display:'flex',gap:6,marginLeft:14}}>
-            {_SCENARIOS.map((s,i)=>(
-              <button key={s.id}
-                className="q-chip"
-                style={{borderColor: i===scenarioIdx?'var(--cyan)':'var(--line)', color: i===scenarioIdx?'var(--cyan)':'var(--text-dim)'}}
-                onClick={()=>onScenarioChange(i)}>{s.id}</button>
-            ))}
-          </div>
+          {!demoProfile && (
+            <div style={{display:'flex',gap:6,marginLeft:14}}>
+              {_SCENARIOS.map((s,i)=>(
+                <button key={s.id}
+                  className="q-chip"
+                  style={{borderColor: i===scenarioIdx?'var(--cyan)':'var(--line)', color: i===scenarioIdx?'var(--cyan)':'var(--text-dim)'}}
+                  onClick={()=>onScenarioChange(i)}>{s.id}</button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -363,7 +380,6 @@ function TokenStrip({plant, stepIdx}){
     <div className="token-strip">
       <h4>Token · {zh?'实时消耗':'Live Usage'}</h4>
       <div className="big mono">{(used/1000).toFixed(2)}<small>K · {zh?'今日':'today'}</small></div>
-      <div className="row"><span>{zh?'强度 / MW':'Density / MW'}</span><span>{(used/plant.capacity).toFixed(0)}</span></div>
       <div className="row"><span>{zh?'调用 / min':'Calls / min'}</span><span>{(8 + stepIdx*0.6).toFixed(1)}</span></div>
       <div className="row"><span>{zh?'成功率':'Success'}</span><span style={{color:'var(--emerald)'}}>98.6%</span></div>
       <svg viewBox="0 0 220 30" className="spark">
@@ -378,53 +394,48 @@ function TokenStrip({plant, stepIdx}){
 
 // ─────────────────────────────────────────────────────────────────────
 // PlantInlineDock — inline 6-card dashboard for img2 mode (replaces popup)
-function PlantInlineDock({plant, scenario, stepIdx, cur, mode, scenarioIdx, onModeChange, onScenarioChange, onOpenModal}){
-  const totalDur = scenario.steps[scenario.steps.length-1].t + 1500;
-  const progress = Math.min(100, (cur?.t || 0) / totalDur * 100);
-  const visibleSteps = scenario.steps.slice(0, stepIdx+1);
+function PlantInlineDock({plant, scenario, stepIdx, cur, mode, scenarioIdx, onModeChange, onScenarioChange}){
+  const steps = scenario.steps || [];
+  const lastT = steps.length ? steps[steps.length - 1].t : 0;
+  const totalDur = lastT + 1500;
+  const progress = steps.length ? Math.min(100, (cur?.t || 0) / totalDur * 100) : 0;
+  const visibleSteps = steps.slice(0, stepIdx+1);
   const activeAgentIds = useMemo(()=>{
     const set = new Set();
     visibleSteps.slice(-3).forEach(s=>{ set.add(s.from); set.add(s.to); });
     return set;
   },[stepIdx, scenario.id]);
 
-  const stopProp = e => e.stopPropagation();
-  const open = (sec) => () => onOpenModal?.(sec);
+  const demoProfile = getPlantDemoProfile(plant);
 
   return (
     <div className="plant-inline-dock">
       <PIDCardKpi
         plant={plant} mode={mode} scenarioIdx={scenarioIdx} scenario={scenario}
-        cur={cur} stepIdx={stepIdx} progress={progress}
-        onModeChange={onModeChange} onScenarioChange={onScenarioChange}
-        onOpen={open('kpi')}/>
+        cur={cur} stepIdx={stepIdx} progress={progress} demoProfile={demoProfile}
+        onModeChange={onModeChange} onScenarioChange={onScenarioChange}/>
 
       <PIDCardTeam
-        plant={plant} activeAgentIds={activeAgentIds}
-        onOpen={open('team')}/>
+        plant={plant} activeAgentIds={activeAgentIds} forceGrayInsp={!!demoProfile?.grayInspInTeam}/>
 
       <PIDCardLog
-        scenario={scenario} steps={visibleSteps}
-        onOpen={open('log')}/>
+        scenario={scenario} steps={visibleSteps}/>
 
       <PIDCardScene
         plant={plant} scenario={scenario} stepIdx={stepIdx} cur={cur}
-        activeAgentIds={activeAgentIds}
-        onOpen={open('scene')}/>
+        activeAgentIds={activeAgentIds}/>
 
-      <PIDCardToken
-        plant={plant} stepIdx={stepIdx}
-        onOpen={open('token')}/>
+      <PIDCardToken plant={plant}/>
     </div>
   );
 }
 
 // ── Card 1: Plant KPI summary + mode tabs + scenario timeline
-function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress, onModeChange, onScenarioChange, onOpen}){
+function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress, demoProfile, onModeChange, onScenarioChange}){
   const zh = _useD_Lang() !== 'en';
   const stopProp = e => e.stopPropagation();
   return (
-    <div className="pid-card pid-c-kpi" onClick={onOpen}>
+    <div className="pid-card pid-c-kpi pid-no-open">
       <div className="pid-k-top">
         <b className="pid-k-name">{zh ? plant.name : (plant.enName || plant.name)}</b>
         <button className="pid-k-btn">▶ {zh?'播放':'Play'}</button>
@@ -435,18 +446,27 @@ function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress,
         <div className="s"><span className="l">{zh?'告警':'Alerts'}</span><span className="v" style={{color: plant.alerts>4?'var(--rose)':'#fff'}}>{plant.alerts}</span></div>
         <div className="s"><span className="l">PR</span><span className="v">{(82+plant.id.charCodeAt(1)%7).toFixed(1)}%</span></div>
       </div>
-      <div className="pid-k-mode">
+      <div className={`pid-k-mode${demoProfile ? ' pid-k-mode-locked' : ''}`}>
         <button className={mode==='auto'?'on':''} onClick={(e)=>{stopProp(e); onModeChange('auto');}}>{zh?'托管模式':'Auto'}</button>
-        <button className={mode==='command'?'on':''} onClick={(e)=>{stopProp(e); onModeChange('command');}}>{zh?'指挥模式':'Command'}</button>
+        <button
+          className={mode==='command'?'on':''}
+          disabled={!!demoProfile}
+          onClick={(e)=>{stopProp(e); onModeChange('command');}}>{zh?'指挥模式':'Command'}</button>
       </div>
       <div className="pid-k-tl">
         <div className="pid-tl-chips">
-          {_SCENARIOS.map((s,i)=>(
-            <button key={s.id}
-              className={`pid-q-chip${i===scenarioIdx?' on':''}`}
-              onClick={(e)=>{stopProp(e); onScenarioChange(i);}}>{s.id}</button>
-          ))}
-          <span className="pid-tl-lbl">{zh?'场景':'Scenario'} {scenario.id} · {scenario.title}</span>
+          {demoProfile ? (
+            <span className="pid-tl-lbl pid-tl-lbl-only">{zh ? demoProfile.timelineZh : demoProfile.timelineEn}</span>
+          ) : (
+            <>
+              {_SCENARIOS.map((s,i)=>(
+                <button key={s.id}
+                  className={`pid-q-chip${i===scenarioIdx?' on':''}`}
+                  onClick={(e)=>{stopProp(e); onScenarioChange(i);}}>{s.id}</button>
+              ))}
+              <span className="pid-tl-lbl">{zh?'场景':'Scenario'} {scenario.id} · {scenario.title}</span>
+            </>
+          )}
         </div>
         <div className="pid-tl-track"><i style={{width: progress+'%'}}/></div>
         <div className="pid-tl-step">step {stepIdx+1}/{scenario.steps.length} · {cur?.tag||''}</div>
@@ -456,7 +476,7 @@ function PIDCardKpi({plant, mode, scenarioIdx, scenario, cur, stepIdx, progress,
 }
 
 // ── Card 2: Digital Team (auto-scrolling list)
-function PIDCardTeam({plant, activeAgentIds, onOpen}){
+function PIDCardTeam({plant, activeAgentIds, forceGrayInsp}){
   const zh = _useD_Lang() !== 'en';
   const ALL_IDS = ['ops','warn','alert','diag','safe','order','sched','pv','insp','query'];
   const listRef = useRef(null);
@@ -477,7 +497,7 @@ function PIDCardTeam({plant, activeAgentIds, onOpen}){
   useEffect(()=>{ if(listRef.current) listRef.current.scrollTop = scrollOffset; },[scrollOffset]);
 
   return (
-    <div className="pid-card pid-c-team" onClick={onOpen}>
+    <div className="pid-card pid-c-team pid-no-open">
       <div className="pid-h">
         <span>{zh?'数字团队':'Digital Team'}</span>
         <span className="pid-h-cnt">{plant.agents.length} / {ALL_IDS.length} {zh?'配备':'staffed'}</span>
@@ -487,7 +507,7 @@ function PIDCardTeam({plant, activeAgentIds, onOpen}){
           const ag = _D_ABI[id];
           if(!ag) return null;
           const cat = _D_CAT[ag.cat];
-          const assigned = plant.agents.includes(id);
+          const assigned = plant.agents.includes(id) && !(forceGrayInsp && id === 'insp');
           const isActive = activeAgentIds.has(id);
           const hasAlert = ag.notif > 0;
           const statusLabel = !assigned ? (zh?'未配备':'N/A')
@@ -511,17 +531,17 @@ function PIDCardTeam({plant, activeAgentIds, onOpen}){
 }
 
 // ── Card 3: Multi-agent collaboration log (auto-scroll)
-function PIDCardLog({scenario, steps, onOpen}){
+function PIDCardLog({scenario, steps}){
   const zh = _useD_Lang() !== 'en';
   const ref = useRef(null);
   useEffect(()=>{
     if(ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   },[steps.length]);
   return (
-    <div className="pid-card pid-c-log" onClick={onOpen}>
+    <div className="pid-card pid-c-log pid-no-open">
       <div className="pid-h">
         <span>{zh?'多 Agent 协同日志':'Multi-Agent Log'}</span>
-        <span className="pid-h-badge">{scenario.id} · {steps.length}/{scenario.steps.length}</span>
+        <span className="pid-h-badge">{steps.length}/{scenario.steps.length}</span>
       </div>
       <div className="pid-log-body" ref={ref}>
         {steps.map((s,i)=>{
@@ -552,14 +572,14 @@ function PIDCardLog({scenario, steps, onOpen}){
 }
 
 // ── Card 5: Full scene (PV grid + agent ring + connections + bubble)
-function PIDCardScene({plant, scenario, stepIdx, cur, activeAgentIds, onOpen}){
+function PIDCardScene({plant, scenario, stepIdx, cur, activeAgentIds}){
   const zh = _useD_Lang() !== 'en';
   const hotCells = useMemo(()=>[16, 17, 28, 29, 64, 76, 88], [plant.id]);
   const fromPos = cur ? NODE_POS[cur.from] : null;
   const toPos = cur ? NODE_POS[cur.to] : null;
 
   return (
-    <div className="pid-card pid-c-scene" onClick={onOpen}>
+    <div className="pid-card pid-c-scene pid-no-open">
       <div className="pid-h">
         <span>{zh?'协同图谱':'Collab Graph'}</span>
         <span className="pid-h-meta">{Object.keys(NODE_POS).length-1} nodes</span>
@@ -623,28 +643,68 @@ function PIDCardScene({plant, scenario, stepIdx, cur, activeAgentIds, onOpen}){
   );
 }
 
-// ── Card 6: TOKEN consumption
-function PIDCardToken({plant, stepIdx, onOpen}){
+// Smooth sparkline path (Catmull-Rom → cubic Bezier)
+function _smoothSparkPaths(values, w = 220, h = 30, amp = 22, tension = 1) {
+  const n = values.length;
+  if (!n) return { line: '', area: '' };
+  const pts = values.map((v, i) => ({
+    x: n === 1 ? w / 2 : i * (w / (n - 1)),
+    y: h - v * amp,
+  }));
+  if (n === 1) {
+    const y = pts[0].y;
+    return {
+      line: `M 0,${y} L ${w},${y}`,
+      area: `M 0,${h} L 0,${y} L ${w},${y} L ${w},${h} Z`,
+    };
+  }
+  let line = `M ${pts[0].x},${pts[0].y}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(n - 1, i + 2)];
+    const cp1x = p1.x + (p2.x - p0.x) * tension / 6;
+    const cp1y = p1.y + (p2.y - p0.y) * tension / 6;
+    const cp2x = p2.x - (p3.x - p1.x) * tension / 6;
+    const cp2y = p2.y - (p3.y - p1.y) * tension / 6;
+    line += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+  }
+  const last = pts[n - 1];
+  return {
+    line,
+    area: `${line} L ${last.x},${h} L ${pts[0].x},${h} Z`,
+  };
+}
+
+// ── Card 6: TOKEN consumption (data: tokenData.js ← Excel)
+function PIDCardToken({plant}){
   const zh = _useD_Lang() !== 'en';
-  const base = 24800;
-  const used = base + stepIdx * 1240 + Math.floor(Math.sin(stepIdx)*120);
-  const spark = useMemo(()=>Array.from({length:32}).map((_,i)=>0.3+0.6*Math.abs(Math.sin(i*0.6+plant.id.length))*(0.6+0.4*Math.random())),[plant.id]);
+  const [now, setNow] = useState(()=>new Date());
+  useEffect(()=>{
+    const id = setInterval(()=>setNow(new Date()), 60000);
+    return ()=>clearInterval(id);
+  },[]);
+  const hourIdx = now.getHours();
+  const snap = useMemo(()=>{
+    const get = window.IRUN_TOKEN?.getSnapshot;
+    return get ? get(plant.id, hourIdx) : null;
+  },[plant.id, hourIdx]);
+  const spark = snap?.spark?.length ? snap.spark : [0];
+  const paths = useMemo(()=>_smoothSparkPaths(spark), [spark]);
   return (
-    <div className="pid-card pid-c-token" onClick={onOpen}>
+    <div className="pid-card pid-c-token pid-no-open">
       <div className="pid-h">
         <span>TOKEN · {zh?'实时消耗':'Live Usage'}</span>
       </div>
-      <div className="pid-tok-big">{(used/1000).toFixed(2)}<small>K · {zh?'今日':'today'}</small></div>
+      <div className="pid-tok-big">{snap?.tokenTotalK ?? '0.00'}<small>K · {zh?'今日':'today'}</small></div>
       <div className="pid-tok-rows">
-        <div className="r"><span>{zh?'强度 / MW':'Density / MW'}</span><span>{(used/plant.capacity).toFixed(0)}</span></div>
-        <div className="r"><span>{zh?'调用 / min':'Calls / min'}</span><span>{(8 + stepIdx*0.6).toFixed(1)}</span></div>
-        <div className="r"><span>{zh?'成功率':'Success'}</span><span style={{color:'var(--emerald)'}}>98.6%</span></div>
+        <div className="r"><span>{zh?'调用 / h':'Calls / h'}</span><span>{snap?.callsHoursText ?? '0.00'}</span></div>
+        <div className="r"><span>{zh?'成功率':'Success'}</span><span style={{color:'var(--emerald)'}}>{snap?.successRateText ?? '0.00'}%</span></div>
       </div>
       <svg viewBox="0 0 220 30" className="pid-tok-spark" preserveAspectRatio="none">
-        <polyline fill="none" stroke="#22d3ee" strokeWidth="1.2"
-          points={spark.map((v,i)=>`${i*(220/(spark.length-1))},${30-v*22}`).join(' ')}/>
-        <polyline fill="rgba(34,211,238,0.12)" stroke="none"
-          points={`0,30 ${spark.map((v,i)=>`${i*(220/(spark.length-1))},${30-v*22}`).join(' ')} 220,30`}/>
+        <path fill="rgba(34,211,238,0.12)" stroke="none" d={paths.area}/>
+        <path fill="none" stroke="#22d3ee" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" d={paths.line}/>
       </svg>
     </div>
   );

@@ -62,6 +62,9 @@ function fmtDate(d){
   const p = n => String(n).padStart(2,'0');
   return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())}`;
 }
+function fmtDateTime(d){
+  return `${fmtDate(d)} ${fmtTime(d)}`;
+}
 
 // ── Weather mock (deterministic by seed; Seniverse-style icons) ──────
 const WX_TABLE = [
@@ -178,7 +181,10 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
             noiseReductionRate: 0,
             pendingAlerts: 0,
           });
-  const util = k.powerRate
+  const displayPwr = theme === 'dark' ? 0 : k.pwr;
+  const util = theme === 'dark'
+    ? '0'
+    : (k.powerRate ?? ((Number(k.pwr || 0) / (Number(k.cap || 0) || 1)) * 100).toFixed(1));
   const yoy = React.useMemo(() => (Math.random() * 10).toFixed(1), [focusPlant?.id]);
 
   return (
@@ -238,7 +244,7 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
         </div>
         <div className="kpi">
           <div className="l">{zh?'实时功率':'Live Power'}</div>
-          <div className="v mono" style={{whiteSpace:'nowrap'}}>{k.pwr.toFixed(1)}<small>MW · {util}%</small></div>
+          <div className="v mono" style={{whiteSpace:'nowrap'}}>{displayPwr.toFixed(1)}<small>MW · {util}%</small></div>
           <div className="kpi-bar"><i style={{width:util+'%'}}/></div>
         </div>
         <div className="kpi">
@@ -298,47 +304,48 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// Live event stream (left)
-function EventStream({focusPlant, scenarioEvents, onCollapse}){
+// Live event stream (left) — 仅展示 data.js GLOBAL_EVENT_TEMPLATES，按时间序逐条推送并滚动
+function EventStream({onCollapse}){
   const l = useLang(); const zh = l !== 'en';
-  const [events, setEvents] = useState(()=> seedEvents(14));
   const containerRef = useRef(null);
 
-  function seedEvents(n){
-    const now = Date.now();
-    return Array.from({length:n}).map((_,i)=>{
-      const tpl = _GET[Math.floor(Math.random()*_GET.length)];
-      return { id:'seed-'+i+'-'+Math.random(), t: now - (n-i)*4500 - Math.random()*1200, ...tpl };
+  const allEvents = React.useMemo(() => {
+    return [..._GET]
+      .map((tpl, i) => ({ id: `global-${i}`, ...tpl }))
+      .sort((a, b) => {
+        const ta = new Date(String(a.date).replace(' ', 'T')).getTime();
+        const tb = new Date(String(b.date).replace(' ', 'T')).getTime();
+        return ta - tb;
+      });
+  }, []);
+
+  const [visibleCount, setVisibleCount] = useState(0);
+
+  // 逐条揭示事件（数据源不变，仅恢复「实时流入」滚动体验）
+  useEffect(() => {
+    if (!allEvents.length) return;
+    const seed = Math.min(8, allEvents.length);
+    setVisibleCount(seed);
+    if (allEvents.length <= seed) return;
+    let cur = seed;
+    const id = setInterval(() => {
+      cur += 1;
+      setVisibleCount(cur);
+      if (cur >= allEvents.length) clearInterval(id);
+    }, 2800);
+    return () => clearInterval(id);
+  }, [allEvents]);
+
+  const list = allEvents.slice(0, visibleCount);
+
+  // 新事件进入时平滑滚到底部
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     });
-  }
-
-  // Periodic global tick — appends ambient events
-  useEffect(()=>{
-    const id = setInterval(()=>{
-      const tpl = _GET[Math.floor(Math.random()*_GET.length)];
-      setEvents(prev => [...prev.slice(-40), { id:'g-'+Date.now()+'-'+Math.random(), t: Date.now(), ...tpl }]);
-    }, 3200);
-    return ()=>clearInterval(id);
-  },[]);
-
-  // Whenever scenario fires a new event, splice it in
-  useEffect(()=>{
-    if (!scenarioEvents || !scenarioEvents.length) return;
-    const latest = scenarioEvents[scenarioEvents.length-1];
-    if (!latest) return;
-    setEvents(prev => [...prev.slice(-50), latest]);
-  },[scenarioEvents]);
-
-  // Auto-scroll to bottom
-  useEffect(()=>{
-    if(containerRef.current){
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  },[events]);
-
-  const list = focusPlant
-    ? events.filter(e => !e.plantId || e.plantId === focusPlant.id).slice(-40)
-    : events.slice(-40);
+  }, [visibleCount, zh]);
 
   return (
     <div className="panel stream corners"><span className="c1"/>
@@ -353,13 +360,12 @@ function EventStream({focusPlant, scenarioEvents, onCollapse}){
           {list.map(e=>{
             const ag = _ABI[e.agent];
             const cat = ag && _CATS[ag.cat];
-            const time = new Date(e.t);
-            const p = n => String(n).padStart(2,'0');
+            const time = new Date(String(e.date).replace(' ', 'T'));
             const evtText = (!zh && e.en) ? e.en : e.text;
             return (
               <div key={e.id} className={`evt sev-${e.sev||'low'}`}>
                 <div className="row1">
-                  <span className="mono">{p(time.getHours())}:{p(time.getMinutes())}:{p(time.getSeconds())}</span>
+                  <span className="mono">{fmtDateTime(time)}</span>
                   <span className="ag" style={{color:cat?.color,borderColor:cat?cat.color+'55':undefined}}>{ag?.code}</span>
                   <span className="who">{zh ? ag?.short : ag?.en}</span>
                 </div>
@@ -1232,32 +1238,82 @@ function AgentTokenPanel({ busyMap, onOpen }) {
 
 // ──────────────────────────────────────────────────────────────────────
 // Skill Market Modal
-const _SKILL_CATS = ['全部','数据分析','运维工具','安全合规','通知推送','自定义'];
+const _SKILL_CATS = [
+  { key:'全部', zh:'全部', en:'All' },
+  { key:'数据分析', zh:'数据分析', en:'Analytics' },
+  { key:'运维工具', zh:'运维工具', en:'Ops Tools' },
+  { key:'安全合规', zh:'安全合规', en:'Safety' },
+  { key:'通知推送', zh:'通知推送', en:'Notify' },
+  { key:'自定义', zh:'自定义', en:'Custom' },
+];
 const _SKILLS = [
-  { id:'weather', icon:'🌤', name:'气象预测', en:'Weather Forecast', cat:'运维工具', ver:'2.1.0', desc:'融合气象局 API，实现 7 天光照预测与逐小时发电量估算', status:'loaded', provider:'润建科技' },
-  { id:'visual',  icon:'📸', name:'图像识别', en:'Visual AI',        cat:'运维工具', ver:'1.4.2', desc:'无人机巡检图像缺陷识别，支持热斑、遮挡、破损自动分类', status:'loaded', provider:'百度智能云' },
-  { id:'dingtalk',icon:'🔔', name:'钉钉推送', en:'DingTalk',         cat:'通知推送', ver:'3.0.1', desc:'告警事件自动推送至钉钉群，支持 @成员 与审批工作流联动', status:'loaded', provider:'钉钉' },
-  { id:'nl2sql',  icon:'🔍', name:'数据问答', en:'NL2SQL Pro',       cat:'数据分析', ver:'1.0.0', desc:'自然语言直接查询运维数据库，生成可视化报表与趋势图', status:'installed', provider:'Anthropic' },
-  { id:'safety',  icon:'🛡', name:'安全合规', en:'Safety Guard',     cat:'安全合规', ver:'2.0.0', desc:'作业票自动审核、危险源识别、应急预案一键触发与存档', status:'installed', provider:'上海昌邑' },
-  { id:'carbon',  icon:'🌱', name:'碳排放计算', en:'Carbon Calc',    cat:'数据分析', ver:'1.2.0', desc:'实时计算光伏减碳量、CCER 生成预测与绿电证书备案辅助', status:'available', provider:'碳阻迹' },
-  { id:'wecom',   icon:'💬', name:'企微机器人', en:'WeCom Bot',       cat:'通知推送', ver:'1.5.0', desc:'企业微信群机器人，支持智能体消息卡片与快捷回复指令', status:'available', provider:'腾讯云' },
-  { id:'grid',    icon:'⚡', name:'电网接入', en:'Grid Connect',     cat:'运维工具', ver:'Beta', desc:'与电网调度系统对接，实时上报发电数据并同步并网状态', status:'beta', provider:'国家电网' },
-  { id:'report',  icon:'📊', name:'报表引擎', en:'Report Engine',    cat:'数据分析', ver:'2.3.1', desc:'日/周/月报自动生成，支持 PDF/Excel 导出与邮件定时发送', status:'available', provider:'帆软软件' },
-  { id:'edge',    icon:'🖥', name:'边缘计算', en:'Edge AI',          cat:'运维工具', ver:'Beta', desc:'本地推理能力，断网场景下仍可运行核心告警与诊断逻辑', status:'beta', provider:'华为云' },
-  { id:'pvfore',  icon:'📈', name:'发电预测', en:'PV Forecast',      cat:'数据分析', ver:'1.9.0', desc:'基于历史数据与气象的短期发电量预测，精度 ≤ 3% 误差', status:'available', provider:'远景能源' },
-  { id:'openapi', icon:'⚙', name:'自定义 API', en:'Custom API',     cat:'自定义', ver:'Any', desc:'通过 OpenAPI 3.0 规范接入任意第三方服务，无需代码', status:'available', provider:'iRun Platform' },
+  { id:'weather', icon:'🌤', name:'气象预测', en:'Weather Forecast', cat:'运维工具', ver:'2.1.0',
+    desc:'聚合多源气象数据，提供 7 天辐照度、温度、风速、降水预报',
+    enDesc:'Multi-source weather data with 7-day irradiance, temperature, wind, precipitation outlook',
+    status:'loaded', provider:'润建聚合', enProvider:'RunJian aggregation' },
+  { id:'pvdefect', icon:'📸', name:'组件缺陷识别', en:'PV Defect Vision', cat:'运维工具', ver:'1.4.2',
+    desc:'无人机与红外巡检图像识别，覆盖热斑、隐裂、积灰、遮挡、破损五类缺陷',
+    enDesc:'Drone & thermal image recognition for hot spots, micro-cracks, soiling, shading, breakage',
+    status:'loaded', provider:'润建', enProvider:'RunJian' },
+  { id:'notify', icon:'🔔', name:'通知中心', en:'Notification Hub', cat:'通知推送', ver:'3.0.1',
+    desc:'统一消息通道，支持钉钉/企微/邮件/短信/WhatsApp，含审批联动',
+    enDesc:'Unified channel for DingTalk / WeCom / Email / SMS / WhatsApp, with approval workflow',
+    status:'loaded', provider:'润建', enProvider:'RunJian' },
+  { id:'dataqa', icon:'🔍', name:'数据问答', en:'Data Q&A', cat:'数据分析', ver:'1.0.0',
+    desc:'自然语言转 SQL 查询运维数据库，返回结构化数据与简单图表',
+    enDesc:'Natural-language to SQL over operations database; returns structured data and simple charts',
+    status:'installed', provider:'智维中台', enProvider:'iRun Platform' },
+  { id:'safety', icon:'🛡', name:'安全合规', en:'Safety Guard', cat:'安全合规', ver:'2.0.0',
+    desc:'作业票智能审核、现场危险源比对、应急预案触发与全过程存档',
+    enDesc:'Permit-to-work auditing, on-site hazard matching, emergency-plan trigger with full audit trail',
+    status:'installed', provider:'润建', enProvider:'RunJian' },
+  { id:'carbon', icon:'🌱', name:'碳排放计算', en:'Carbon Accounting', cat:'数据分析', ver:'1.2.0',
+    desc:'实时核算光伏减碳量，支持 CCER / I-REC / GRES 申报辅助',
+    enDesc:'Real-time PV carbon-reduction accounting; supports CCER / I-REC / GRES filing',
+    status:'available', provider:'润建', enProvider:'RunJian' },
+  { id:'report', icon:'📊', name:'报表引擎', en:'Report Engine', cat:'数据分析', ver:'2.3.1',
+    desc:'日/周/月报自动生成，支持 PDF/Excel 导出与邮件定时分发',
+    enDesc:'Auto-generated daily / weekly / monthly reports with PDF/Excel export & scheduled email',
+    status:'available', provider:'润建', enProvider:'RunJian' },
+  { id:'edge', icon:'🖥', name:'边缘推理节点', en:'Edge Inference', cat:'运维工具', ver:'0.9.0-beta',
+    desc:'本地化推理与告警闭环，断网场景维持核心智能体在线',
+    enDesc:'On-prem inference keeping core alert & diagnosis agents online when offline',
+    status:'beta', provider:'润建', enProvider:'RunJian' },
+  { id:'pvfore', icon:'📈', name:'发电预测', en:'PV Forecast', cat:'数据分析', ver:'1.9.0',
+    desc:'历史数据 + 气象融合的功率预测，日前 MAE ≤8%、超短期 ≤5%',
+    enDesc:'Historical + weather fusion forecast; day-ahead MAE ≤ 8%, ultra-short ≤ 5%',
+    status:'available', provider:'润建', enProvider:'RunJian' },
+  { id:'grid', icon:'⚡', name:'电网接入适配', en:'Grid Adapter', cat:'运维工具', ver:'0.1.0-beta',
+    desc:'适配 D5000 调度数据上送、AGC/AVC 响应、并网点状态同步',
+    enDesc:'Dispatch data upload (D5000), AGC/AVC response, grid-point status sync',
+    status:'beta', provider:'润建', enProvider:'RunJian' },
+  { id:'knowledge', icon:'📚', name:'知识库检索', en:'Knowledge Retrieval', cat:'数据分析', ver:'1.0.0',
+    desc:'规程、案例、设备手册的 RAG 检索，支撑数字专家与知识助手',
+    enDesc:'RAG over SOPs, case base, equipment manuals — fueling Expert / Diagnosis / Knowledge agents',
+    status:'loaded', provider:'智维中台', enProvider:'iRun Platform' },
+  { id:'api', icon:'⚙', name:'通用 API 适配', en:'API Connector', cat:'自定义', ver:'1.0.0',
+    desc:'基于 OpenAPI 3.0 的低代码配置接入，对接客户业务系统',
+    enDesc:'Low-code connector based on OpenAPI 3.0, for customer system integration',
+    status:'available', provider:'智维中台', enProvider:'iRun Platform' },
 ];
 
 function SkillModal({ onClose }){
+  const l = useLang(); const zh = l !== 'en';
   const [cat, setCat] = useState('全部');
   const [q, setQ] = useState('');
-  const filtered = _SKILLS.filter(s =>
-    (cat === '全部' || s.cat === cat) &&
-    (s.name.includes(q) || s.en.toLowerCase().includes(q.toLowerCase()) || s.desc.includes(q))
-  );
+  const qLower = q.toLowerCase();
+  const filtered = _SKILLS.filter(s => {
+    if (cat !== '全部' && s.cat !== cat) return false;
+    if (!q) return true;
+    const hay = [s.name, s.en, s.desc, s.enDesc, s.provider, s.enProvider].join(' ').toLowerCase();
+    return hay.includes(qLower);
+  });
   const loaded = _SKILLS.filter(s => s.status === 'loaded').length;
+  const installed = _SKILLS.filter(s => s.status === 'installed').length;
 
-  const statusLabel = { loaded:'已加载', installed:'已安装', available:'可安装', beta:'Beta' };
+  const statusLabel = zh
+    ? { loaded:'已加载', installed:'已安装', available:'可安装', beta:'Beta' }
+    : { loaded:'Loaded', installed:'Installed', available:'Available', beta:'Beta' };
 
   return (
     <div className="modal-bd" onClick={onClose}>
@@ -1265,13 +1321,15 @@ function SkillModal({ onClose }){
         {/* header */}
         <div className="skill-modal-hd">
           <div className="skill-modal-title">
-            <h2>⚙ SKILL MARKETPLACE · 技能市场</h2>
-            <p>集成第三方技能 · 扩展智能体能力边界 · OpenAPI / SDK 双模式接入</p>
+            <h2>{zh ? '⚙ 技能市场 · SKILL MARKETPLACE' : '⚙ SKILL MARKETPLACE'}</h2>
+            <p>{zh
+              ? '集成第三方技能 · 扩展智能体能力边界 · OpenAPI / SDK 双模式接入'
+              : 'Integrate third-party skills · Extend agent capabilities · OpenAPI / SDK access'}</p>
           </div>
           <div className="skill-modal-stats">
-            <div className="skill-modal-stat"><span className="sv">{_SKILLS.length}</span><span className="sl">总技能</span></div>
-            <div className="skill-modal-stat"><span className="sv" style={{color:'var(--cyan)'}}>{loaded}</span><span className="sl">已加载</span></div>
-            <div className="skill-modal-stat"><span className="sv" style={{color:'var(--emerald)'}}>2</span><span className="sl">已安装</span></div>
+            <div className="skill-modal-stat"><span className="sv">{_SKILLS.length}</span><span className="sl">{zh?'总技能':'Total'}</span></div>
+            <div className="skill-modal-stat"><span className="sv" style={{color:'var(--cyan)'}}>{loaded}</span><span className="sl">{zh?'已加载':'Loaded'}</span></div>
+            <div className="skill-modal-stat"><span className="sv" style={{color:'var(--emerald)'}}>{installed}</span><span className="sl">{zh?'已安装':'Installed'}</span></div>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
@@ -1280,11 +1338,11 @@ function SkillModal({ onClose }){
         <div className="skill-modal-toolbar">
           <div className="skill-search">
             <span style={{color:'var(--text-mute)',fontSize:12}}>🔍</span>
-            <input placeholder="搜索技能名称、功能描述…" value={q} onChange={e=>setQ(e.target.value)}/>
+            <input placeholder={zh?'搜索技能名称、功能描述…':'Search skills, descriptions…'} value={q} onChange={e=>setQ(e.target.value)}/>
           </div>
           <div className="skill-cats">
             {_SKILL_CATS.map(c=>(
-              <div key={c} className={`skill-cat${cat===c?' active':''}`} onClick={()=>setCat(c)}>{c}</div>
+              <div key={c.key} className={`skill-cat${cat===c.key?' active':''}`} onClick={()=>setCat(c.key)}>{zh ? c.zh : c.en}</div>
             ))}
           </div>
         </div>
@@ -1296,17 +1354,17 @@ function SkillModal({ onClose }){
               <div className="skill-card-top">
                 <div className="skill-card-icon">{s.icon}</div>
                 <div className="skill-card-info">
-                  <div className="skill-card-name">{s.name}</div>
-                  <div className="skill-card-en">{s.en} · v{s.ver}</div>
+                  <div className="skill-card-name">{zh ? s.name : s.en}</div>
+                  <div className="skill-card-en">{zh ? `${s.en} · v${s.ver}` : `v${s.ver}`}</div>
                 </div>
               </div>
-              <div className="skill-card-desc">{s.desc}</div>
+              <div className="skill-card-desc">{zh ? s.desc : s.enDesc}</div>
               <div className="skill-card-footer">
-                <span className="skill-card-provider">{s.provider}</span>
+                <span className="skill-card-provider">{zh ? s.provider : s.enProvider}</span>
                 <span className={`skill-status ${s.status}`}>{statusLabel[s.status]}</span>
               </div>
               {(s.status==='available') && (
-                <button className="skill-install-btn" style={{marginTop:6}}>+ 安装</button>
+                <button className="skill-install-btn" style={{marginTop:6}}>{zh ? '+ 安装' : '+ Install'}</button>
               )}
             </div>
           ))}
@@ -1314,7 +1372,9 @@ function SkillModal({ onClose }){
 
         {/* footer */}
         <div className="skill-modal-footer">
-          <span>已加载 {loaded} 个技能 · 全部技能 {_SKILLS.length} 个 · 支持 OpenAPI / MCP / SDK 三种接入方式</span>
+          <span>{zh
+            ? `已加载 ${loaded} 个技能 · 全部技能 ${_SKILLS.length} 个 · 支持 OpenAPI / MCP / SDK 三种接入方式`
+            : `${loaded} loaded · ${_SKILLS.length} skills total · OpenAPI / MCP / SDK supported`}</span>
           <span style={{color:'var(--violet)'}}>iRun Skill Runtime v2.4.0</span>
         </div>
       </div>
@@ -1674,7 +1734,7 @@ function PlantAgentField({plant, busyMap, cur}){
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, PlantAgentField, DispatchedRobots, useClock, fmtTime, fmtDate, LangCtx };
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, PlantAgentField, DispatchedRobots, useClock, fmtTime, fmtDate, fmtDateTime, LangCtx };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left
@@ -1842,7 +1902,9 @@ function ChestIcon({variant, color}){
 
 // ──────────────────────────────────────────────────────────────────────
 // AgentsRail — vertical rail on the far right showing all agents as robot tiles
-function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpen, onDroneFly, droneActive, tooltipEnabled=true}){
+const DARK_RAIL_AGENTS = new Set(['ops', 'warn', 'safe']);
+const getDemoPlantProfile = (id) => window.IRUN?.getDemoPlantProfile?.(id) || null;
+function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpen, onDroneFly, droneActive, tooltipEnabled=true, theme='light'}){
   const l = useLang(); const zh = l !== 'en';
   const [hoverId, setHoverId] = useState(null);
   const [hoverTop, setHoverTop] = useState(0);
@@ -1868,22 +1930,26 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
         {_AGENTS.map(a=>{
           const cat = _CATS[a.cat];
           const isOff = focusPlant && !focusPlant.agents.includes(a.id);
+          const isInspDemoOff = !!getDemoPlantProfile(focusPlant?.id)?.grayInspInTeam && a.id === 'insp';
+          const isDarkLocked = theme === 'dark' && !DARK_RAIL_AGENTS.has(a.id);
+          const disabled = isOff || isDarkLocked || isInspDemoOff;
           const busy = busyMap?.[a.id];
           return (
             <div key={a.id}
-                 className={`agent-tile ${selected===a.id?'active':''} ${isOff?'off':''} ${busy?'busy':''}`}
+                 className={`agent-tile ${selected===a.id && !disabled?'active':''} ${disabled?'off':''} ${isDarkLocked?'locked':''} ${busy && !disabled?'busy':''}`}
                  style={{'--cat-color':cat.color}}
-                 onMouseEnter={(e)=>handleEnter(a.id, e)}
+                 onMouseEnter={(e)=>{ if(!disabled) handleEnter(a.id, e); }}
                  onClick={()=>{
+                   if(disabled) return;
                    onSelect?.(a.id);
                    setHoverId(null);
                  }}
-                 onDoubleClick={()=>onOpen?.(a.id)}>
+                 onDoubleClick={()=>{ if(!disabled) onOpen?.(a.id); }}>
               <div className="robot-wrap">
-                <RobotAvatar agent={a} size={42} glow={busy || selected===a.id}/>
-                {busy && <span className="status-dot work"/>}
-                {!busy && !isOff && <span className="status-dot online"/>}
-                {isOff && <span className="status-dot off"/>}
+                <RobotAvatar agent={a} size={42} glow={!isDarkLocked && (busy || selected===a.id)}/>
+                {busy && !isDarkLocked && <span className="status-dot work"/>}
+                {!busy && !disabled && <span className="status-dot online"/>}
+                {disabled && <span className="status-dot off"/>}
               </div>
               <div className="agent-tile-name">
                 <div className="nm-en">{zh ? a.short : a.en}</div>

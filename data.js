@@ -97,7 +97,18 @@ const PLANTS = [
   // ── Tenant: ILP (International Landing Plants) · 7 plants ───────────────
   { id: '1879736396404850688', name: '', enName: '',    short: 'Banten-A',  tenant: 'ilp', region: 'Indonesia·万丹',  enRegion: 'Indonesia · Banten',   city: '万丹',     enCity: 'Banten',
     capacity: 50.0, power: 0, gen: 218.4, alerts: 3, risk: 'mid',  status: '托管中',   enStatus: 'Managed',
-    x: 78, y: 68, mapX: '62%', mapY: '55%', agents: ['ops','warn','alert','diag','order','sched','query'] },
+    x: 78, y: 68, mapX: '62%', mapY: '55%',
+    agents: ['ops','warn','alert','diag','order','sched','insp','query'],
+    defaultScenarioIdx: 1,
+    robotField: [
+      { agent:'insp',  x:53, y:44 },
+      { agent:'drone', x:65, y:33 },
+      { agent:'diag',  x:46, y:51 },
+      { agent:'order', x:38, y:24 },
+      { agent:'sched', x:50, y:18 },
+      { agent:'ops',   x:70, y:28 },
+    ],
+  },
 
   { id: '1861683646672760832', name: '', enName: '', short: 'Cebu-N',   tenant: 'ilp', region: 'Philippines·宿务', enRegion: 'Philippines · Cebu',   city: '宿务',     enCity: 'Cebu',
     capacity: 42.0, power:0, gen: 184.5, alerts: 5, risk: 'high', status: '指挥模式', enStatus: 'Command Mode',
@@ -107,8 +118,8 @@ const PLANTS = [
     capacity: 36.5, power: 0, gen: 162.4, alertsPLANTS: 1, risk: 'low',  status: '托管中',   enStatus: 'Managed',
     x: 64, y: 74, mapX: '41%', mapY: '68%',
     agents: ['ops','warn','safe','alert','diag','order','sched','pv','insp','query'],
-    // Default to Scenario B (UAV inspection — vision-driven) for this plant
-    defaultScenarioIdx: 1,
+    // 演示站：固定场景 A（告警驱动 · 自主闭环）
+    defaultScenarioIdx: 0,
     // Multi-robot field — same logical layout as Hanoi-N (PV array + ops on top, field below)
     robotField: [
       { agent:'insp',  x:53, y:44 },  // 巡检 — 阵列中央（B 场景主角）
@@ -149,7 +160,6 @@ function aggregateOf(plants){
 // Default top-bar aggregate (kept for back-compat — full set across all tenants)
 const AGGREGATE = aggregateOf(PLANTS);
 
-// Scenario A: 组串告警 → 去噪 → 诊断 → 工单 → 排程 → 现场 → 安全 → 填报 → 验收 → 归档
 const SCENARIO_A = {
   id: 'A', title: '场景 A · 告警驱动 · 自主闭环', enTitle: 'Scenario A · Alarm-Driven · Self-Closure',
   steps: [
@@ -192,62 +202,62 @@ const SCENARIO_B = {
 
 const SCENARIOS = [SCENARIO_A, SCENARIO_B];
 
-// Global event templates — used to spawn left-side stream when no plant is focused
+// Global event templates — 左侧「实时事件流」唯一数据源（按 date 时间序展示）
 const GLOBAL_EVENT_TEMPLATES = [
-   // ── 05-25 Penang 水面 · 精简消缺 ──
-   { agent: 'diag',  text: '【Penang·消缺】接入 3 条告警 · 根因：水面高湿致绝缘/接头腐蚀', en: 'Penang-FPV · 3 alerts diagnosed · humidity-driven insulation/connector corrosion', sev: 'mid' },
-   { agent: 'alert', text: '【Penang·消缺】关联历史工单+72h研判（3 条）· 绝缘故障优先', en: 'Penang-FPV · 3 alerts reviewed w/ history · insulation fault first', sev: 'mid' },
-   { agent: 'alert', text: '【Penang·消缺】研判总结 · 同站 1 工单 · 合并 CB1-3 历史单', en: 'Penang-FPV · summary · 1 site ticket · merged CB1-3 legacy', sev: 'mid' },
-   { agent: 'order', text: '【Penang·消缺】创建工单 WO-2026-0610-PNG-001 · 3 任务项', en: 'Penang-FPV · Ticket WO-2026-0610-PNG-001 created · 3 tasks', sev: 'low' },
-   // ── 05-26 ──
-   { agent: 'pv',    text: '【Penang·消缺】@光伏 "绝缘排查/电流不平衡/换熔丝"', en: 'Penang-FPV · @PV-Assist "insulation, current imbalance, fuse swap"', sev: 'low' },
-   { agent: 'order', text: '【Penang·消缺】3 任务项回单 · 接头进水/熔丝已处理', en: 'Penang-FPV · 3 tasks reported · water-ingress & fuse fixed', sev: 'low' },
-   { agent: 'order', text: '【Penang·消缺】自动验收归档 · 挽回 ≈ 2,600 kWh/月', en: 'Penang-FPV · auto-accepted & archived · ≈ 2,600 kWh/mo recovered', sev: 'low' },
-   // ── 05-28 Johor 消缺触发 ＋ Penang 巡检计划（并行）──
-   { agent: 'ops',   text: '【Johor·消缺】⚠ KPI 考核预警 · 风险严重', en: 'Johor · KPI assessment alert · severe', sev: 'high' },
-   { agent: 'ops',   text: '【Penang·巡检】季度巡检到期 · 健康度 87.0 分', en: 'Penang-UAV · quarterly inspection due · health 87.0', sev: 'low' },
-   { agent: 'query', text: '【Penang·巡检】调取历史巡检 · 遗留 2 处 PID 待复核', en: 'Penang-UAV · history pulled · 2 legacy PID to recheck', sev: 'low' },
-   { agent: 'order', text: '【Penang·巡检】生成季度巡检计划（草案）', en: 'Penang-UAV · quarterly inspection plan drafted', sev: 'low' },
-   { agent: 'sched', text: '【Penang·巡检】天气/水域窗口 · 05-30 晴低浪最佳', en: 'Penang-UAV · weather/water window · 05-30 best', sev: 'low' },
-   { agent: 'warn',  text: '【Johor·消缺】5 台逆变器组串低效', en: 'Johor · 5 inverters with string under-performance', sev: 'mid' },
-   { agent: 'query', text: '【Johor·消缺】拉取告警台账 · 6 未处理 + 1 处理中', en: 'Johor · alert ledger · 6 open + 1 in-progress', sev: 'low' },
-   { agent: 'diag',  text: '【Johor·消缺】低效根因完成 · 热斑/遮挡为主', en: 'Johor · root-cause done · hot-spot/shading dominant', sev: 'mid' },
-   { agent: 'diag',  text: '【Johor·消缺】5 台设备告警原因分析完成', en: 'Johor · 5 device alert causes analyzed', sev: 'mid' },
-   { agent: 'alert', text: '【Johor·消缺】72h 研判（7 台）· 1 观察 6 消缺', en: 'Johor · 7 units reviewed · 1 watch / 6 fix', sev: 'mid' },
-   { agent: 'alert', text: '【Johor·消缺】研判总结 · 同站 1 工单 · 合并 WO-2026-0520-008', en: 'Johor · summary · 1 site ticket · merged WO-2026-0520-008', sev: 'mid' },
-   { agent: 'order', text: '【Johor·消缺】发起建单 · 并行调用排程/安全', en: 'Johor · ticket init · calling Schedule/Safety', sev: 'low' },
-   { agent: 'sched', text: '【Johor·消缺】人员/技能/天气匹配 · 含路径规划', en: 'Johor · staff/skill/weather matched · route planned', sev: 'low' },
-   { agent: 'safe',  text: '【Johor·消缺】作业风险校验 · 整单中高（登高/直流高压）', en: 'Johor · risk check · med-high (climbing/DC HV)', sev: 'mid' },
-   { agent: 'order', text: '【Johor·消缺】工单 WO-2026-0528-001 创建 · 6 任务项', en: 'Johor · Ticket WO-2026-0528-001 created · 6 tasks', sev: 'low' },
-   { agent: 'pv',    text: '【Johor·消缺】王工 @光伏 "离线排查 + 换卡恢复"', en: 'Johor · Wang @PV-Assist "offline triage + SIM swap"', sev: 'low' },
-   // ── 05-29 Johor 收尾 ＋ Penang 巡检任务下发 ──
-   { agent: 'order', text: '【Penang·巡检】创建无人机任务 INSP-2026-0530-PNG-F01', en: 'Penang-UAV · drone task INSP-2026-0530-PNG-F01 created', sev: 'low' },
-   { agent: 'pv',    text: '【Johor·消缺】张工 @光伏 "绝缘测试 + 接头/组件判别"', en: 'Johor · Zhang @PV-Assist "insulation test + connector vs module"', sev: 'low' },
-   { agent: 'pv',    text: '【Johor·消缺】李工 @光伏 "散热确认 + 登高遮挡排查"', en: 'Johor · Li @PV-Assist "cooling check + climb shading"', sev: 'low' },
-   { agent: 'order', text: '【Johor·消缺】任务项① COM1-2 回单 · 离线已恢复', en: 'Johor · task① COM1-2 reported · back online', sev: 'low' },
-   { agent: 'order', text: '【Johor·消缺】任务项②③④ COM1-3/4/5 回单 · 接入异常消除', en: 'Johor · task②③④ COM1-3/4/5 · access fault cleared', sev: 'low' },
-   { agent: 'order', text: '【Johor·消缺】任务项⑤⑥ COM1-6/7 回单 · 散热/遮挡消除', en: 'Johor · task⑤⑥ COM1-6/7 · cooling/shading cleared', sev: 'low' },
-   { agent: 'order', text: '【Johor·消缺】整单验收归档 · 回补 ≈ 9000~12000 kWh', en: 'Johor · ticket accepted & archived · ≈ 9-12 MWh recovered', sev: 'low' },
-   // ── 05-30 Penang 无人机执行/分析/派单 ＋ Johor 观察 D+1 ──
-   { agent: 'insp',  text: '【Penang·巡检】UAV 接收任务 · 起飞前自检通过', en: 'Penang-UAV · task received · pre-flight check OK', sev: 'low' },
-   { agent: 'insp',  text: '【Penang·巡检】UAV 巡检中 · 双光实时回传', en: 'Penang-UAV · inspecting · dual-cam live feed', sev: 'low' },
-   { agent: 'insp',  text: '【Penang·巡检】UAV 巡检完成 · 回传 1,940 张', en: 'Penang-UAV · finished · 1,940 images uploaded', sev: 'low' },
-   { agent: 'insp',  text: '【Penang·巡检】图像分析中 · 红外测温 + AI 识别', en: 'Penang-UAV · analyzing · IR thermography + AI', sev: 'low' },
-   { agent: 'insp',  text: '【Penang·巡检】缺陷清单 18 处 · 缺陷率 0.37%', en: 'Penang-UAV · 18 defects found · rate 0.37%', sev: 'mid' },
-   { agent: 'insp',  text: '【Penang·巡检】巡检报告生成 RPT-A-PNG-2026-0530-001', en: 'Penang-UAV · report RPT-A-PNG-2026-0530-001 generated', sev: 'low' },
-   { agent: 'order', text: '【Penang·巡检】18 缺陷归集 · 创建电站级消缺工单', en: 'Penang-UAV · 18 defects → 1 site fix ticket', sev: 'mid' },
-   { agent: 'sched', text: '【Penang·巡检】人员/天气匹配 · 含工作艇路径', en: 'Penang-UAV · staff/weather matched · boat route', sev: 'low' },
-   { agent: 'safe',  text: '【Penang·巡检】风险校验 · 整单高（直流高压 + 水上溺水）', en: 'Penang-UAV · risk high (DC HV + water/drowning)', sev: 'high' },
-   { agent: 'order', text: '【Penang·巡检】工单 WO-2026-0530-PNG-001 创建 · 5 任务项', en: 'Penang-UAV · Ticket WO-2026-0530-PNG-001 created · 5 tasks', sev: 'low' },
-   { agent: 'ops',   text: '【Johor·消缺】观察 D+1 · 告警/低效清零 · 发电 ↑19%', en: 'Johor · D+1 · alerts cleared · yield ↑19%', sev: 'low' },
-   // ── 05-31 Penang 现场消缺 ＋ Johor 观察 D+2 ──
-   { agent: 'pv',    text: '【Penang·巡检】张工 @光伏 "热斑更换/二极管/PID 治理"', en: 'Penang-UAV · Zhang @PV-Assist "hot-spot/diode/PID"', sev: 'low' },
-   { agent: 'order', text: '【Penang·巡检】回单 · Class3 全消缺 · PID 进入修复期', en: 'Penang-UAV · reported · Class3 cleared · PID in recovery', sev: 'low' },
-   { agent: 'ops',   text: '【Johor·消缺】观察 D+2 · 风险降级 · 偏差回补至 -16000 kWh', en: 'Johor · D+2 · risk downgraded · gap → -16,000 kWh', sev: 'low' },
-   // ── 06-01 ~ 06-02 Penang 回灌 + 复盘 ──
-   { agent: 'order', text: '【Penang·巡检】同步作业结果 → 巡检智能体 · 台账更新', en: 'Penang-UAV · results synced → Inspect · ledger updated', sev: 'low' },
-   { agent: 'ops',   text: '【Penang·巡检】消缺后 KPI 复盘 · 健康度 90.2 分', en: 'Penang-UAV · post-fix KPI review · health 90.2', sev: 'low' },
-   { agent: 'order', text: '【Penang·巡检】更新下次巡检计划 · 下次 ≤ 2026-08-30', en: 'Penang-UAV · next inspection plan ≤ 2026-08-30', sev: 'low' },
+    // ── 05-25 Penang 水面 · 精简消缺 ──
+ { date: '2026-05-25 08:00:00', agent: 'diag', text: '【Penang·消缺】接入 3 条告警 · 根因：水面高湿致绝缘/接头腐蚀', en: 'Penang-FPV · 3 alerts diagnosed · humidity-driven insulation/connector corrosion', sev: 'mid' },
+ { date: '2026-05-25 08:05:00', agent: 'alert', text: '【Penang·消缺】关联历史工单+72h研判（3 条）· 绝缘故障优先', en: 'Penang-FPV · 3 alerts reviewed w/ history · insulation fault first', sev: 'mid' },
+ { date: '2026-05-25 08:06:00', agent: 'alert', text: '【Penang·消缺】研判总结 · 同站 1 工单 · 合并 CB1-3 历史单', en: 'Penang-FPV · summary · 1 site ticket · merged CB1-3 legacy', sev: 'mid' },
+ { date: '2026-05-25 08:10:00', agent: 'order', text: '【Penang·消缺】创建工单 WO-2026-0610-PNG-001 · 3 任务项', en: 'Penang-FPV · Ticket WO-2026-0610-PNG-001 created · 3 tasks', sev: 'low' },
+ // ── 05-26 ──
+ { date: '2026-05-26 09:30:00', agent: 'pv', text: '【Penang·消缺】@光伏 "绝缘排查/电流不平衡/换熔丝"', en: 'Penang-FPV · @PV-Assist "insulation, current imbalance, fuse swap"', sev: 'low' },
+ { date: '2026-05-26 15:20:00', agent: 'order', text: '【Penang·消缺】3 任务项回单 · 接头进水/熔丝已处理', en: 'Penang-FPV · 3 tasks reported · water-ingress & fuse fixed', sev: 'low' },
+ { date: '2026-05-26 17:30:00', agent: 'order', text: '【Penang·消缺】自动验收归档 · 挽回 ≈ 2,600 kWh/月', en: 'Penang-FPV · auto-accepted & archived · ≈ 2,600 kWh/mo recovered', sev: 'low' },
+ // ── 05-28 Johor 消缺触发 ＋ Penang 巡检计划（并行）──
+ { date: '2026-05-28 02:00:00', agent: 'ops', text: '【Johor·消缺】⚠ KPI 考核预警 · 风险严重', en: 'Johor · KPI assessment alert · severe', sev: 'high' },
+ { date: '2026-05-28 02:00:00', agent: 'ops', text: '【Penang·巡检】季度巡检到期 · 健康度 87.0 分', en: 'Penang-UAV · quarterly inspection due · health 87.0', sev: 'low' },
+ { date: '2026-05-28 02:01:06', agent: 'query', text: '【Penang·巡检】调取历史巡检 · 遗留 2 处 PID 待复核', en: 'Penang-UAV · history pulled · 2 legacy PID to recheck', sev: 'low' },
+ { date: '2026-05-28 02:05:00', agent: 'order', text: '【Penang·巡检】生成季度巡检计划（草案）', en: 'Penang-UAV · quarterly inspection plan drafted', sev: 'low' },
+ { date: '2026-05-28 02:08:00', agent: 'sched', text: '【Penang·巡检】天气/水域窗口 · 05-30 晴低浪最佳', en: 'Penang-UAV · weather/water window · 05-30 best', sev: 'low' },
+ { date: '2026-05-28 03:00:04', agent: 'warn', text: '【Johor·消缺】5 台逆变器组串低效', en: 'Johor · 5 inverters with string under-performance', sev: 'mid' },
+ { date: '2026-05-28 03:30:09', agent: 'query', text: '【Johor·消缺】拉取告警台账 · 6 未处理 + 1 处理中', en: 'Johor · alert ledger · 6 open + 1 in-progress', sev: 'low' },
+ { date: '2026-05-28 03:31:00', agent: 'diag', text: '【Johor·消缺】低效根因完成 · 热斑/遮挡为主', en: 'Johor · root-cause done · hot-spot/shading dominant', sev: 'mid' },
+ { date: '2026-05-28 03:31:30', agent: 'diag', text: '【Johor·消缺】5 台设备告警原因分析完成', en: 'Johor · 5 device alert causes analyzed', sev: 'mid' },
+ { date: '2026-05-28 03:33:00', agent: 'alert', text: '【Johor·消缺】72h 研判（7 台）· 1 观察 6 消缺', en: 'Johor · 7 units reviewed · 1 watch / 6 fix', sev: 'mid' },
+ { date: '2026-05-28 03:33:40', agent: 'alert', text: '【Johor·消缺】研判总结 · 同站 1 工单 · 合并 WO-2026-0520-008', en: 'Johor · summary · 1 site ticket · merged WO-2026-0520-008', sev: 'mid' },
+ { date: '2026-05-28 08:00:00', agent: 'order', text: '【Johor·消缺】发起建单 · 并行调用排程/安全', en: 'Johor · ticket init · calling Schedule/Safety', sev: 'low' },
+ { date: '2026-05-28 08:00:08', agent: 'sched', text: '【Johor·消缺】人员/技能/天气匹配 · 含路径规划', en: 'Johor · staff/skill/weather matched · route planned', sev: 'low' },
+ { date: '2026-05-28 08:05:22', agent: 'safe', text: '【Johor·消缺】作业风险校验 · 整单中高（登高/直流高压）', en: 'Johor · risk check · med-high (climbing/DC HV)', sev: 'mid' },
+ { date: '2026-05-28 08:05:40', agent: 'order', text: '【Johor·消缺】工单 WO-2026-0528-001 创建 · 6 任务项', en: 'Johor · Ticket WO-2026-0528-001 created · 6 tasks', sev: 'low' },
+ { date: '2026-05-28 14:35:00', agent: 'pv', text: '【Johor·消缺】王工 @光伏 "离线排查 + 换卡恢复"', en: 'Johor · Wang @PV-Assist "offline triage + SIM swap"', sev: 'low' },
+ // ── 05-29 Johor 收尾 ＋ Penang 巡检任务下发 ──
+ { date: '2026-05-29 08:00:00', agent: 'order', text: '【Penang·巡检】创建无人机任务 INSP-2026-0530-PNG-F01', en: 'Penang-UAV · drone task INSP-2026-0530-PNG-F01 created', sev: 'low' },
+ { date: '2026-05-29 09:50:00', agent: 'pv', text: '【Johor·消缺】张工 @光伏 "绝缘测试 + 接头/组件判别"', en: 'Johor · Zhang @PV-Assist "insulation test + connector vs module"', sev: 'low' },
+ { date: '2026-05-29 13:35:00', agent: 'pv', text: '【Johor·消缺】李工 @光伏 "散热确认 + 登高遮挡排查"', en: 'Johor · Li @PV-Assist "cooling check + climb shading"', sev: 'low' },
+ { date: '2026-05-29 15:10:00', agent: 'order', text: '【Johor·消缺】任务项① COM1-2 回单 · 离线已恢复', en: 'Johor · task① COM1-2 reported · back online', sev: 'low' },
+ { date: '2026-05-29 15:12:00', agent: 'order', text: '【Johor·消缺】任务项②③④ COM1-3/4/5 回单 · 接入异常消除', en: 'Johor · task②③④ COM1-3/4/5 · access fault cleared', sev: 'low' },
+ { date: '2026-05-29 15:15:00', agent: 'order', text: '【Johor·消缺】任务项⑤⑥ COM1-6/7 回单 · 散热/遮挡消除', en: 'Johor · task⑤⑥ COM1-6/7 · cooling/shading cleared', sev: 'low' },
+ { date: '2026-05-29 15:30:00', agent: 'order', text: '【Johor·消缺】整单验收归档 · 回补 ≈ 9000~12000 kWh', en: 'Johor · ticket accepted & archived · ≈ 9-12 MWh recovered', sev: 'low' },
+ // ── 05-30 Penang 无人机执行/分析/派单 ＋ Johor 观察 D+1 ──
+ { date: '2026-05-30 10:25:00', agent: 'insp', text: '【Penang·巡检】UAV 接收任务 · 起飞前自检通过', en: 'Penang-UAV · task received · pre-flight check OK', sev: 'low' },
+ { date: '2026-05-30 10:30:00', agent: 'insp', text: '【Penang·巡检】UAV 巡检中 · 双光实时回传', en: 'Penang-UAV · inspecting · dual-cam live feed', sev: 'low' },
+ { date: '2026-05-30 13:50:00', agent: 'insp', text: '【Penang·巡检】UAV 巡检完成 · 回传 1,940 张', en: 'Penang-UAV · finished · 1,940 images uploaded', sev: 'low' },
+ { date: '2026-05-30 13:55:00', agent: 'insp', text: '【Penang·巡检】图像分析中 · 红外测温 + AI 识别', en: 'Penang-UAV · analyzing · IR thermography + AI', sev: 'low' },
+ { date: '2026-05-30 14:25:00', agent: 'insp', text: '【Penang·巡检】缺陷清单 18 处 · 缺陷率 0.37%', en: 'Penang-UAV · 18 defects found · rate 0.37%', sev: 'mid' },
+ { date: '2026-05-30 14:55:00', agent: 'insp', text: '【Penang·巡检】巡检报告生成 RPT-A-PNG-2026-0530-001', en: 'Penang-UAV · report RPT-A-PNG-2026-0530-001 generated', sev: 'low' },
+ { date: '2026-05-30 15:00:00', agent: 'order', text: '【Penang·巡检】18 缺陷归集 · 创建电站级消缺工单', en: 'Penang-UAV · 18 defects → 1 site fix ticket', sev: 'mid' },
+ { date: '2026-05-30 15:06:00', agent: 'sched', text: '【Penang·巡检】人员/天气匹配 · 含工作艇路径', en: 'Penang-UAV · staff/weather matched · boat route', sev: 'low' },
+ { date: '2026-05-30 15:14:00', agent: 'safe', text: '【Penang·巡检】风险校验 · 整单高（直流高压 + 水上溺水）', en: 'Penang-UAV · risk high (DC HV + water/drowning)', sev: 'high' },
+ { date: '2026-05-30 15:25:00', agent: 'order', text: '【Penang·巡检】工单 WO-2026-0530-PNG-001 创建 · 5 任务项', en: 'Penang-UAV · Ticket WO-2026-0530-PNG-001 created · 5 tasks', sev: 'low' },
+ { date: '2026-05-30 18:00:00', agent: 'ops', text: '【Johor·消缺】观察 D+1 · 告警/低效清零 · 发电 ↑19%', en: 'Johor · D+1 · alerts cleared · yield ↑19%', sev: 'low' },
+ // ── 05-31 Penang 现场消缺 ＋ Johor 观察 D+2 ──
+ { date: '2026-05-31 09:20:00', agent: 'pv', text: '【Penang·巡检】张工 @光伏 "热斑更换/二极管/PID 治理"', en: 'Penang-UAV · Zhang @PV-Assist "hot-spot/diode/PID"', sev: 'low' },
+ { date: '2026-05-31 15:40:00', agent: 'order', text: '【Penang·巡检】回单 · Class3 全消缺 · PID 进入修复期', en: 'Penang-UAV · reported · Class3 cleared · PID in recovery', sev: 'low' },
+ { date: '2026-05-31 18:00:00', agent: 'ops', text: '【Johor·消缺】观察 D+2 · 风险降级 · 偏差回补至 -16000 kWh', en: 'Johor · D+2 · risk downgraded · gap → -16,000 kWh', sev: 'low' },
+ // ── 06-01 ~ 06-02 Penang 回灌 + 复盘 ──
+ { date: '2026-06-01 11:00:00', agent: 'order', text: '【Penang·巡检】同步作业结果 → 巡检智能体 · 台账更新', en: 'Penang-UAV · results synced → Inspect · ledger updated', sev: 'low' },
+ { date: '2026-06-02 01:00:00', agent: 'ops', text: '【Penang·巡检】消缺后 KPI 复盘 · 健康度 90.2 分', en: 'Penang-UAV · post-fix KPI review · health 90.2', sev: 'low' },
+ { date: '2026-06-02 02:00:00', agent: 'order', text: '【Penang·巡检】更新下次巡检计划 · 下次 ≤ 2026-08-30', en: 'Penang-UAV · next inspection plan ≤ 2026-08-30', sev: 'low' },
 ];
 
 // Recommended quick prompts for the right-side dispatch console
@@ -1029,10 +1039,40 @@ const QUICK_PROMPTS = [
   ...PV_EXPO_ALERT_QA.map(x => ({ a: 'alert', t: x.qZh, en: x.qEn })),
 ];
 
+/** 聚焦时隐藏右侧对话调度的电站 */
+const DISPATCH_HIDDEN_PLANT_IDS = new Set([
+  '1881233694553112576',
+  '1879736396404850688',
+]);
+function isDispatchHiddenPlant(id) {
+  return id != null && DISPATCH_HIDDEN_PLANT_IDS.has(String(id));
+}
+
+/** 演示电站：托管锁定、固定场景、时间轴文案（不展示 A/B 切换） */
+const DEMO_PLANT_PROFILES = {
+  '1881233694553112576': {
+    scenarioIdx: 0,
+    timelineZh: '告警驱动 · 自主闭环',
+    timelineEn: 'Alarm-Driven · Self-Closure',
+    grayInspInTeam: true,
+  },
+  '1879736396404850688': {
+    scenarioIdx: 1,
+    timelineZh: '无人机巡检 · 图像驱动',
+    timelineEn: 'UAV Inspection · Vision-Driven',
+  },
+};
+function getDemoPlantProfile(id) {
+  if (id == null) return null;
+  return DEMO_PLANT_PROFILES[String(id)] || null;
+}
+
 window.IRUN = {
   AGENT_CATEGORIES, AGENTS, AGENT_BY_ID,
   TENANTS, PLANTS, AGGREGATE, aggregateOf,
   SCENARIOS, SCENARIO_A, SCENARIO_B,
+  DISPATCH_HIDDEN_PLANT_IDS, isDispatchHiddenPlant,
+  DEMO_PLANT_PROFILES, getDemoPlantProfile,
   GLOBAL_EVENT_TEMPLATES, QUICK_PROMPTS,
   PV_EXPO_QA,
   PV_EXPO_QUERY_QA,
