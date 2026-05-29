@@ -102,15 +102,15 @@ function Map2Overlay({ focusId, onFocus, subMode, tenantId, plants }) {
       {(subMode === 'show' || subMode === 'pic1' || subMode === 'pic2') && (
         <>
           <div className="patrol-robot patrol-robot-1" aria-hidden="true">
-            <img src="IRunRobot.png" alt=""/>
+            <div className="patrol-robot-sprite"/>
             <div className="patrol-robot-shadow"/>
           </div>
           <div className="patrol-robot patrol-robot-2" aria-hidden="true">
-            <img src="IRunRobot.png" alt=""/>
+            <div className="patrol-robot-sprite"/>
             <div className="patrol-robot-shadow"/>
           </div>
           <div className="patrol-robot patrol-robot-3" aria-hidden="true">
-            <img src="IRunRobot.png" alt=""/>
+            <div className="patrol-robot-sprite"/>
             <div className="patrol-robot-shadow"/>
           </div>
         </>
