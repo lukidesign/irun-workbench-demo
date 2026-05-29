@@ -1598,7 +1598,7 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
               </svg>
             </div>
             <div className="section" style={{marginTop:18}}>
-              <h3>操作</h3>
+              <h3>{zh ? '操作' : 'Actions'}</h3>
               <div style={{display:'flex',gap:8,marginTop:8}}>
                 <button
                   className="q-chip"
@@ -1609,7 +1609,7 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
                     onClose?.();
                   }}
                 >
-                  与该智能体对话 →
+                  {zh ? '与该智能体对话 →' : 'Chat with this agent →'}
                 </button>
               </div>
             </div>
