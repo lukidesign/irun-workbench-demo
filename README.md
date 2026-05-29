@@ -2,7 +2,7 @@
 
 仿 runjian PMMS 思路、面向新能源电站的「数字孪生运维指挥中心」演示。10 大智能体作为数字团队协同运维，暗色科技风格。
 
-**当前版本：v0.5.0** · 源需求：`design_pkg/workbench-demo-20260525/project/uploads/iRun Workbench Demo-1f363335.md`
+**当前版本：v0.5.2** · 源需求：`design_pkg/workbench-demo-20260525/project/uploads/iRun Workbench Demo-1f363335.md`
 
 ## 运行
 
@@ -115,6 +115,8 @@ GitHub Pages：Settings → Pages → Source 选 `main` 分支 `/ (root)`，约 
 
 ## 版本历史
 
+- **v0.5.2** — 总览页 5 个电站点坐标（mapX/mapY）对准实景位置（Penang/Melaka/Johor/Kedah/Perak）
+- **v0.5.1** — 总览页 3 个巡逻机器人改用序列帧角色走路动画（Sprite01.png · 16 帧 · steps(16) · 2s/循环 · 0.8×）· 各机器人按红圈区域椭圆循环巡逻
 - **v0.5.0** — UAV 点击巡飞（JOHOR-COMMERCIAL 屋顶蛇形航线来回 1 次；总览/其他电站原椭圆规则，统一静态 drone 图标）· JOHOR / PENANG-COMMERCIAL 多智能体布场（沿巡检红线/漂浮光伏阵列）· 智能体 Token 数据面板 agentTokenData.js · drone anchorOnly 仅作连线锚点
 - **v0.4.0** — 展会版：真实电站数据接入（fetch.js）· Token 消耗数据 tokenData.js + 构建脚本 · 全局事件流重构为 Penang/Johor 消缺巡检剧本 · 展会助手对话 Markdown
 - **v0.3.3** — PlantAgentField 智能体连线 + 6px 流动光点
