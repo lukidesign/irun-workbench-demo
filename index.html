@@ -1651,8 +1651,9 @@ body{
 .dispatched-robots-layer{
   position:absolute;inset:0;pointer-events:none;z-index:6;
 }
-.plant-robot.dispatched .pr-glow{
-  background:radial-gradient(ellipse, rgba(167,139,250,0.45), transparent 70%);
+/* 派发机器人复用总览页巡检机器人的序列帧形象（Sprite01.png）+ 青色光晕 */
+.plant-robot.dispatched .patrol-robot-sprite{
+  filter:drop-shadow(0 0 8px rgba(34,211,238,0.6)) drop-shadow(0 0 16px rgba(34,211,238,0.32));
 }
 .pr-bubble{
   position:absolute;

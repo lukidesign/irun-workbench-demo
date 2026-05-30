@@ -2148,12 +2148,12 @@ function DispatchedRobot({id, agentId, text, onDone}){
         setSt({x, y, facingLeft, opacity, walk: true});
       } else if (elapsed < walkDur + lingerDur){
         const last = PLANT_ROBOT_PATH[PLANT_ROBOT_PATH.length-1];
-        setSt({x: last.x, y: last.y, facingLeft: false, opacity: 1, walk: false});
+        setSt({x: last.x, y: last.y, facingLeft: true, opacity: 1, walk: false});
         setShowBubble(prev => prev ? prev : true);
       } else if (elapsed < totalDur){
         const last = PLANT_ROBOT_PATH[PLANT_ROBOT_PATH.length-1];
         const u = (elapsed - walkDur - lingerDur) / fadeDur;
-        setSt({x: last.x, y: last.y - u*3, facingLeft: false, opacity: 1-u, walk: false});
+        setSt({x: last.x, y: last.y - u*3, facingLeft: true, opacity: 1-u, walk: false});
       } else {
         if (!doneRef.current){ doneRef.current = true; onDone?.(id); }
         return;
@@ -2165,11 +2165,11 @@ function DispatchedRobot({id, agentId, text, onDone}){
   },[]);
 
   return (
-    <div className={`plant-robot dispatched${st.facingLeft?' flip':''}${st.walk?' walking':''}`}
+    <div className="plant-robot dispatched"
          style={{left:st.x+'%', top:st.y+'%', opacity:st.opacity}}>
-      <div className="pr-shadow"/>
-      <div className="pr-sprite"><img src="IRunRobot.png" alt="robot"/></div>
-      <div className="pr-glow"/>
+      <div className="patrol-robot-sprite"
+           style={{transform: st.facingLeft ? 'scaleX(1)' : 'scaleX(-1)'}}/>
+      <div className="patrol-robot-shadow"/>
       {showBubble && ag && (
         <div className={`pr-bubble${st.facingLeft?'':' flip'}`}>
           <div className="pr-bubble-head">
