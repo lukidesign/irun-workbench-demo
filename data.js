@@ -141,7 +141,7 @@ const PLANTS = [
 
   { id: '1879736315115044864', name: '', enName: '', short: 'Manila-E',  tenant: 'ilp', region: 'Philippines·马尼拉', enRegion: 'Philippines · Manila', city: '马尼拉', enCity: 'Manila',
     capacity: 38.0, power: 0, gen: 158.0, alerts: 1, risk: 'low',  status: '托管中',   enStatus: 'Managed',
-    x: 70, y: 78, mapX: '45%', mapY: '40%', agents: ['ops','warn','alert','diag','order','sched','query'] },
+    x: 70, y: 78, mapX: '45%', mapY: '35%', agents: ['ops','warn','alert','diag','order','sched','query'] },
 
   { id: '1879736307422691328', name: '', enName: '',  short: 'Penang-W',  tenant: 'ilp', region: 'Malaysia·槟城',  enRegion: 'Malaysia · Penang',    city: '槟城',     enCity: 'Penang',
     capacity: 32.0, power: 0, gen: 138.0, alerts: 3, risk: 'mid',  status: '托管中',   enStatus: 'Managed',
