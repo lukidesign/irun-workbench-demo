@@ -141,7 +141,7 @@ function Map2Overlay({ focusId, onFocus, subMode, tenantId, plants }) {
           >
             <div className="map2-pin-label">
               <span className="map2-pin-name">{pinName}</span>
-              <span className="map2-pin-meta">{plant.power}kWp · {statusLabel}</span>
+              <span className="map2-pin-meta">{plant.power}kW · {statusLabel}</span>
             </div>
             <div className="map2-pin-line"/>
             <div className="map2-pin-dot">

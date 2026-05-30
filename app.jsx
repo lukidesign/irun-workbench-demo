@@ -8,6 +8,7 @@ const { Scene3D } = window.IRUN_SCENE3D;
 const { PLANTS: APP_PLANTS, TENANTS: APP_TENANTS, AGENTS: APP_AGENTS, AGENT_BY_ID: APP_ABI, aggregateOf: APP_AGG_OF } = window.IRUN;
 const isDispatchHiddenPlant = window.IRUN?.isDispatchHiddenPlant || (() => false);
 const getDemoPlantProfile = (id) => window.IRUN?.getDemoPlantProfile?.(id) || null;
+const isUavDemoPlant = (id) => window.IRUN?.isUavDemoPlant?.(id) || false;
 
 function App(){
   const [plants, setPlants] = useState(() => window.IRUN?.PLANTS || APP_PLANTS || []);
@@ -67,6 +68,18 @@ function App(){
     setOverviewBots(prev => prev.filter(b => b.key !== key));
   }, []);
 
+  // 地图 pin / TopBar 切换电站 → 写入对话调度输入框上下文
+  const applyDispatchPlantCtx = useCallback((id, plant) => {
+    const p = plant || plants.find(x => String(x.id) === String(id));
+    const resetDispatchInput = dispatchCollapsed && !!selectedAgent;
+    const bindPlantToQuestions = dispatchCollapsed && !isDispatchHiddenPlant(id);
+    if (resetDispatchInput) setSelectedAgent(null);
+    const clickKey = `${id}:${Date.now()}`;
+    setDispatchPlantCtx(p
+      ? { id: p.id, name: p.name, resetInput: resetDispatchInput, bindPlantToQuestions, clickKey }
+      : { id, name: '', resetInput: resetDispatchInput, bindPlantToQuestions, clickKey });
+  }, [plants, dispatchCollapsed, selectedAgent]);
+
   // Switching tenant → drop focus & return to OVERVIEW, recall any bot
   const onTenantChange = useCallback((idx) => {
     setTenantIdx(idx);
@@ -77,6 +90,14 @@ function App(){
   // Plants visible under the current tenant
   const tenantPlants = plants.filter(p => p.tenant === tenant.id);
   const tenantAgg = APP_AGG_OF ? APP_AGG_OF(tenantPlants) : { plants: tenantPlants.length, capacity:0, power:0, gen:0, alerts:0, risk:0 };
+
+  const handlePlantChange = useCallback((id) => {
+    if (!dispatchCollapsed) {
+      applyDispatchPlantCtx(id, tenantPlants.find(x => String(x.id) === String(id)));
+    }
+    setFocusId(id);
+  }, [dispatchCollapsed, tenantPlants, applyDispatchPlantCtx]);
+
   const [lang, setLang] = useState(()=>{ try{ return localStorage.getItem('irun:lang')||'zh'; }catch(e){ return 'zh'; } });
   const [theme, setTheme] = useState(()=>{ try{ return localStorage.getItem('irun:theme')||'light'; }catch(e){ return 'light'; } });
   const toggleTheme = () => setTheme(t => {
@@ -105,6 +126,7 @@ function App(){
   const [mode, setMode] = useState('auto');
   const [busyMap, setBusyMap] = useState({});
   const [droneFlying, setDroneFlying] = useState(false);
+  const onDroneFlightDone = useCallback(() => setDroneFlying(false), []);
   // Command-mode dispatched robots: each = single walker spawned by Dispatch send
   const [dispatchedRobots, setDispatchedRobots] = useState([]);
   const onDispatchCommand = useCallback((agentId, text) => {
@@ -259,6 +281,17 @@ function App(){
     onScenarioChange: handleScenarioChange,
   });
 
+  // UAV 演示站：进入 img2 即启动循环巡飞（场景步不再控制起飞）
+  const uavDemoLoop = viewMode === 'img2' && mode === 'auto' && isUavDemoPlant(focusPlant?.id);
+  useEffect(() => {
+    if (viewMode !== 'img2' || mode === 'command') {
+      setDroneFlying(false);
+      return;
+    }
+    if (isUavDemoPlant(focusPlant?.id)) setDroneFlying(true);
+    else setDroneFlying(false);
+  }, [viewMode, mode, focusPlant?.id]);
+
   // ESC to close
   useEffect(()=>{
     const onKey = e => {
@@ -320,15 +353,8 @@ function App(){
           plants={plants}
           focusId={focusId}
           onFocus={(id, plant)=>{
-            // 保存一份点击时的电站上下文，供调度输入框使用（怎么用由你决定）
             const p = plant || plants.find(x => x.id === id);
-            const resetDispatchInput = dispatchCollapsed && !!selectedAgent;
-            const bindPlantToQuestions = dispatchCollapsed && !isDispatchHiddenPlant(id);
-            if (resetDispatchInput) setSelectedAgent(null);
-            const clickKey = `${id}:${Date.now()}`;
-            setDispatchPlantCtx(p
-              ? { id: p.id, name: p.name, resetInput: resetDispatchInput, bindPlantToQuestions, clickKey }
-              : { id, name: '', resetInput: resetDispatchInput, bindPlantToQuestions, clickKey });
+            applyDispatchPlantCtx(id, p);
             const hideDispatch = isDispatchHiddenPlant(id);
             if (!dispatchCollapsed) {
               setStreamCollapsed(true);
@@ -414,7 +440,7 @@ function App(){
       {(viewMode === 'model' || viewMode === 'day' || viewMode === 'night') && <Scene3D mode={viewMode}/>}
 
       {/* top KPIs */}
-      <TopBar focusPlant={focusPlant} plants={tenantPlants} agg={tenantAgg} onPlantChange={setFocusId} tenant={tenant} tenantIdx={tenantIdx} onTenant={onTenantChange} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang} theme={theme} onTheme={toggleTheme}/>
+      <TopBar focusPlant={focusPlant} plants={tenantPlants} agg={tenantAgg} onPlantChange={handlePlantChange} tenant={tenant} tenantIdx={tenantIdx} onTenant={onTenantChange} onBack={()=>setFocusId(null)} lang={lang} onLang={toggleLang} theme={theme} onTheme={toggleTheme}/>
 
       {/* left + right rails over map */}
       <div className="stage">
@@ -422,7 +448,7 @@ function App(){
           <div className={`left-rail ${streamCollapsed?'collapsed':''}`}>
             {streamCollapsed
               ? <EventStreamTab onExpand={()=>toggleStream(false)}/>
-              : <EventStream onCollapse={()=>toggleStream(true)}/>
+              : <EventStream focusPlant={focusPlant} onCollapse={()=>toggleStream(true)}/>
             }
           </div>
         )}
@@ -446,12 +472,18 @@ function App(){
         onSelect={(id)=>{ setSelectedAgent(id); if (id && dispatchCollapsed && !hideDispatchRail) toggleDispatch(false); }}
         onOpen={setOpenAgent}
         onSkillOpen={()=>setOpenSkillMarket(true)}
-        onDroneFly={()=>setDroneFlying(true)}
+        onDroneFly={()=>setDroneFlying(v=>!v)}
         droneActive={droneFlying}
         tooltipEnabled={dispatchCollapsed}/>
 
       {/* drone fly overlay */}
-      {droneFlying && <DroneFlight onDone={()=>setDroneFlying(false)} plant={focusPlant}/>}
+      {droneFlying && (
+        <DroneFlight
+          plant={focusPlant}
+          loop={uavDemoLoop}
+          onDone={uavDemoLoop ? undefined : onDroneFlightDone}
+        />
+      )}
 
       {/* img2 plant view:
             - command mode → clear field, render any dispatched walking robots

@@ -16,7 +16,9 @@ function agentSkill(a, i, zh) {
   return zh ? s : (a.enSkills?.[i] || s);
 }
 
-function stepText(s, zh) { return zh ? s.text : (s.en || s.text); }
+function stepText(s, zh) {
+  return zh ? s.text : (s.en || s.text);
+}
 function stepTag(s, zh) { return zh ? s.tag : (s.entag || s.tag); }
 function isSafetyStep(s) { return s?.tag === '安全' || s?.entag === 'Safety'; }
 
@@ -28,7 +30,7 @@ const {
   AGGREGATE: _AGG,
   GLOBAL_EVENT_TEMPLATES: _GET,
   QUICK_PROMPTS: _QP,
-  TENANTS: _TENANTS
+  TENANTS: _TENANTS,
 } = window.IRUN;
 
 function Markdown({ text }) {
@@ -78,6 +80,62 @@ function fmtDate(d){
 }
 function fmtDateTime(d){
   return `${fmtDate(d)} ${fmtTime(d)}`;
+}
+function fmtDateTimeMinute(d){
+  const p = n => String(n).padStart(2,'0');
+  return `${fmtDate(d)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function resolveEventTime(tpl) {
+  if (tpl.date) {
+    const t = new Date(tpl.date.replace(' ', 'T'));
+    if (!isNaN(t.getTime())) return t;
+  }
+  if (tpl.offsetMin != null) {
+    const t = new Date(Date.now() - tpl.offsetMin * 60000);
+    t.setSeconds(0, 0);
+    return t;
+  }
+  return new Date();
+}
+function buildGlobalEvents(now) {
+  const cutoff = now.getTime();
+  return [..._GET]
+    .map((tpl, i) => ({ id: `global-${i}`, ...tpl, _time: resolveEventTime(tpl) }))
+    .filter(e => e._time.getTime() <= cutoff)
+    .sort((a, b) => a._time.getTime() - b._time.getTime());
+}
+function derivePlantStreamTag(plant) {
+  if (!plant) return null;
+  const profile = window.IRUN?.getDemoPlantProfile?.(plant.id);
+  if (profile?.streamTag) return profile.streamTag;
+  const name = String(plant.name || plant.enName || plant.short || '').trim();
+  const m = name.match(/^([A-Za-z]+)/);
+  return m ? m[1] : null;
+}
+function extractEventStreamTag(evt) {
+  const m = String(evt.text || '').match(/【([^·】]+)·/);
+  if (m) return m[1].trim();
+  const m2 = String(evt.en || '').trim().match(/^([A-Za-z]+)/);
+  return m2 ? m2[1] : null;
+}
+function eventMatchesPlant(evt, plant) {
+  if (!plant) return true;
+  const plantTag = derivePlantStreamTag(plant);
+  if (!plantTag) return true;
+  const evtTag = extractEventStreamTag(evt);
+  if (!evtTag) return false;
+  return evtTag.toLowerCase() === plantTag.toLowerCase();
+}
+function buildAgentWorkflowLog(agentId, now, zh) {
+  return _GET
+    .filter(tpl => tpl.agent === agentId)
+    .map(tpl => ({
+      time: resolveEventTime(tpl),
+      text: (!zh && tpl.en) ? tpl.en : tpl.text,
+    }))
+    .filter(e => e.time.getTime() <= now.getTime())
+    .sort((a, b) => a.time.getTime() - b.time.getTime())
+    .map(e => [fmtDateTimeMinute(e.time), e.text]);
 }
 
 // ── Weather mock (deterministic by seed; Seniverse-style icons) ──────
@@ -238,7 +296,6 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
                        }}>
                     <span className={`cpm-dot cpm-dot-${p.risk||'low'}`}/>
                     <span className="cpm-name">{zh ? p.name : (p.enName || p.name)}</span>
-                    <span className="cpm-meta">{p.power.toFixed(1)} kWp</span>
                   </div>
                 ))}
               </div>
@@ -277,7 +334,7 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
         <div className="kpi">
           <div className="l">{zh?'KPI 风险':'KPI Risk'}</div>
           <div className="v mono" style={{color: k.risk?'var(--amber)':'var(--emerald)'}}>{k.risk}<small>{zh?'站需关注':' Needs Attn'}</small></div>
-          <div className="delta">{zh?'运营智能体 · 持续监测':'Ops Agent · Monitoring'}</div>
+          <div className="delta">{zh?'运营智能体 · 持续监测':'Ops · Monitoring'}</div>
         </div>
       </div>
 
@@ -319,45 +376,68 @@ function TopBar({focusPlant, plants, agg, onPlantChange, tenant, tenantIdx, onTe
 
 // ──────────────────────────────────────────────────────────────────────
 // Live event stream (left) — 仅展示 data.js GLOBAL_EVENT_TEMPLATES，按时间序逐条推送并滚动
-function EventStream({onCollapse}){
+function EventStream({onCollapse, focusPlant}){
   const l = useLang(); const zh = l !== 'en';
   const containerRef = useRef(null);
-
-  const allEvents = React.useMemo(() => {
-    return [..._GET]
-      .map((tpl, i) => ({ id: `global-${i}`, ...tpl }))
-      .sort((a, b) => {
-        const ta = new Date(String(a.date).replace(' ', 'T')).getTime();
-        const tb = new Date(String(b.date).replace(' ', 'T')).getTime();
-        return ta - tb;
-      });
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
   }, []);
 
-  const [visibleCount, setVisibleCount] = useState(0);
+  const allEvents = React.useMemo(
+    () => buildGlobalEvents(now).filter(e => eventMatchesPlant(e, focusPlant)),
+    [now, focusPlant?.id, focusPlant?.name]
+  );
 
-  // 逐条揭示事件（数据源不变，仅恢复「实时流入」滚动体验）
+  const eventCount = allEvents.length;
+  const [visibleCount, setVisibleCount] = useState(0);
+  const seedCount = Math.min(8, eventCount);
+  const loopResetRef = useRef(false);
+
+  // 逐条揭示全部事件；滚到底后暂停，再从头循环
   useEffect(() => {
-    if (!allEvents.length) return;
-    const seed = Math.min(8, allEvents.length);
-    setVisibleCount(seed);
-    if (allEvents.length <= seed) return;
+    if (!eventCount) return;
+    const seed = Math.min(8, eventCount);
     let cur = seed;
+    setVisibleCount(cur);
+
+    const revealMs = 2800;
+    const pauseMs = 3000;
+    let pausing = false;
+
     const id = setInterval(() => {
+      if (pausing) return;
+      if (cur >= eventCount) {
+        pausing = true;
+        setTimeout(() => {
+          pausing = false;
+          cur = seed;
+          loopResetRef.current = true;
+          setVisibleCount(cur);
+        }, pauseMs);
+        return;
+      }
       cur += 1;
       setVisibleCount(cur);
-      if (cur >= allEvents.length) clearInterval(id);
-    }, 2800);
+    }, revealMs);
+
     return () => clearInterval(id);
-  }, [allEvents]);
+  }, [eventCount]);
 
-  const list = allEvents.slice(0, visibleCount);
+  const list = allEvents.slice(0, visibleCount || seedCount);
 
-  // 新事件进入时平滑滚到底部
+  // 追加事件滚到底；循环重置时滚回顶部
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el || !visibleCount) return;
     requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      if (loopResetRef.current) {
+        loopResetRef.current = false;
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      }
     });
   }, [visibleCount, zh]);
 
@@ -374,12 +454,12 @@ function EventStream({onCollapse}){
           {list.map(e=>{
             const ag = _ABI[e.agent];
             const cat = ag && _CATS[ag.cat];
-            const time = new Date(String(e.date).replace(' ', 'T'));
+            const time = e._time;
             const evtText = (!zh && e.en) ? e.en : e.text;
             return (
               <div key={e.id} className={`evt sev-${e.sev||'low'}`}>
                 <div className="row1">
-                  <span className="mono">{fmtDateTime(time)}</span>
+                  <span className="mono">{fmtDateTimeMinute(time)}</span>
                   <span className="ag" style={{color:cat?.color,borderColor:cat?cat.color+'55':undefined}}>{ag?.code}</span>
                   <span className="who">{zh ? ag?.short : ag?.en}</span>
                 </div>
@@ -545,21 +625,35 @@ const _SESSIONS_SEED = [
 ];
 
 // ── Dispatch chat helpers (PV Expo Q&A + streaming) ───────────────────
+function matchAgentPrefix(text) {
+  const raw = String(text || '');
+  if (!raw.startsWith('@')) return null;
+  const rest = raw.slice(1);
+  const candidates = _AGENTS.flatMap(a => [
+    { agent: a, token: a.short },
+    { agent: a, token: a.en },
+  ]).filter(x => x.token);
+  candidates.sort((a, b) => b.token.length - a.token.length);
+  for (const { agent, token } of candidates) {
+    if (rest === token || rest.startsWith(token + ' ')) {
+      return { agent, prefix: `@${token} `, body: rest.slice(token.length).trim() };
+    }
+  }
+  return null;
+}
+
 function parseAgentFromText(text) {
-  const m = String(text || '').match(/^@(\S+)/);
-  if (!m) return null;
-  const token = m[1];
-  return _AGENTS.find(a => a.short === token || a.en === token) || null;
+  return matchAgentPrefix(text)?.agent || null;
 }
 
 function stripAgentPrefix(text) {
-  return String(text || '').replace(/^@\S+\s*/, '').trim();
+  const m = matchAgentPrefix(text);
+  return m ? m.body : String(text || '').trim();
 }
 
 function splitAgentCommand(text) {
-  const raw = String(text || '');
-  const m = raw.match(/^(@\S+\s*)(.*)$/);
-  return m ? { prefix: m[1], body: m[2].trim() } : { prefix: '', body: raw.trim() };
+  const m = matchAgentPrefix(text);
+  return m ? { prefix: m.prefix, body: m.body } : { prefix: '', body: String(text || '').trim() };
 }
 
 function getKnownPlantNames() {
@@ -589,21 +683,31 @@ function extractPlantNameFromInput(text) {
   return names.find(name => body.includes(name)) || '';
 }
 
+function replaceKnownPlantName(text, plantName) {
+  const name = String(plantName || '').trim();
+  if (!name) return text;
+  const names = [...new Set(getKnownPlantNames())].sort((a, b) => b.length - a.length);
+  for (const old of names) {
+    if (String(text || '').includes(old)) return String(text).replace(old, name);
+  }
+  return text;
+}
+
 function composePlantInput(text, plantName) {
   const name = String(plantName || '').trim();
   if (!name) return text;
   const { prefix, body } = splitAgentCommand(text);
   if (!body) return prefix + name;
   if (isKnownPlantName(body)) return prefix + name;
-  if (includesKnownPlantName(body)) return text;
-  return prefix + name + body;
+  if (includesKnownPlantName(body)) return prefix + replaceKnownPlantName(body, name);
+  return prefix + name + ' ' + body;
 }
 
 function composeQuestionInput(prefix, question, plantName) {
   const q = String(question || '').trim();
   const name = String(plantName || '').trim();
   if (!name || includesKnownPlantName(q)) return prefix + q;
-  return prefix + name + q;
+  return prefix + name + ' ' + q;
 }
 
 function stripPlantNameFromQuestion(text, plant) {
@@ -702,11 +806,8 @@ function findExpoQA(agentId, cleanText) {
   if (agentId === 'sched') return findSchedQA(cleanText);
   if (agentId === 'order') return findOrderQA(cleanText);
   if (agentId === 'alert') return findAlertQA(cleanText);
-  const key = agentId === 'pv' ? 'PV_EXPO_QA'
-    : null;
-  if (!key) return null;
-  const list = window.IRUN?.[key] || [];
-  return list.find(x => normQaText(x.qZh) === c || normQaText(x.qEn) === c) || null;
+  if (agentId === 'pv') return findExpoQAFuzzy(window.IRUN?.PV_EXPO_QA || [], cleanText);
+  return null;
 }
 
 function pickExpoAnswer(hit, cleanText, zh) {
@@ -1021,40 +1122,54 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
       return { ...s, msgs: newMsgs, title: newTitle, agent: targetId };
     }));
     if (activePlantCtx?.name && text.includes(activePlantCtx.name)) consumePlantCtx();
-    setInput('');
-    onSelectAgent?.(null);
+    const keepAg = _ABI[targetId];
+    if (keepAg) {
+      const prefix = `@${zh ? keepAg.short : keepAg.en} `;
+      setInput(prefix);
+      if (selectedAgent !== targetId) onSelectAgent?.(targetId);
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          const v = inputRef.current.value;
+          inputRef.current.setSelectionRange(v.length, v.length);
+        }
+      }, 0);
+    } else {
+      setInput('');
+    }
   };
 
   const parsedInputAgent = parseAgentFromText(input);
+  const chipAgentId = parsedInputAgent?.id || selectedAgent || null;
+  const effectiveAgent = parsedInputAgent || (chipAgentId && _ABI[chipAgentId]) || null;
   const qaInput = stripPlantNameFromQuestion(input, plantCtx);
-  const queryHit = parsedInputAgent?.id === 'query' ? findQueryQA(qaInput) : null;
-  const opsHit = parsedInputAgent?.id === 'ops' ? findOpsQA(qaInput) : null;
-  const safeHit = parsedInputAgent?.id === 'safe' ? findSafeQA(qaInput) : null;
-  const diagHit = parsedInputAgent?.id === 'diag' ? findDiagQA(qaInput) : null;
-  const inspHit = parsedInputAgent?.id === 'insp' ? findInspQA(qaInput) : null;
-  const warnHit = parsedInputAgent?.id === 'warn' ? findWarnQA(qaInput) : null;
-  const schedHit = parsedInputAgent?.id === 'sched' ? findSchedQA(qaInput) : null;
-  const orderHit = parsedInputAgent?.id === 'order' ? findOrderQA(qaInput) : null;
-  const alertHit = parsedInputAgent?.id === 'alert' ? findAlertQA(qaInput) : null;
-  const expoHit = parsedInputAgent && ['pv'].includes(parsedInputAgent.id)
-    ? findExpoQA(parsedInputAgent.id, qaInput)
+  const queryHit = effectiveAgent?.id === 'query' ? findQueryQA(qaInput) : null;
+  const opsHit = effectiveAgent?.id === 'ops' ? findOpsQA(qaInput) : null;
+  const safeHit = effectiveAgent?.id === 'safe' ? findSafeQA(qaInput) : null;
+  const diagHit = effectiveAgent?.id === 'diag' ? findDiagQA(qaInput) : null;
+  const inspHit = effectiveAgent?.id === 'insp' ? findInspQA(qaInput) : null;
+  const warnHit = effectiveAgent?.id === 'warn' ? findWarnQA(qaInput) : null;
+  const schedHit = effectiveAgent?.id === 'sched' ? findSchedQA(qaInput) : null;
+  const orderHit = effectiveAgent?.id === 'order' ? findOrderQA(qaInput) : null;
+  const alertHit = effectiveAgent?.id === 'alert' ? findAlertQA(qaInput) : null;
+  const expoHit = effectiveAgent && ['pv'].includes(effectiveAgent.id)
+    ? findExpoQA(effectiveAgent.id, qaInput)
     : null;
-  const canSend = !!parsedInputAgent && qaInput.length > 0 && (
-    parsedInputAgent.id === 'query' ? !!queryHit
-    : parsedInputAgent.id === 'ops' ? !!opsHit
-    : parsedInputAgent.id === 'safe' ? !!safeHit
-    : parsedInputAgent.id === 'diag' ? !!diagHit
-    : parsedInputAgent.id === 'insp' ? !!inspHit
-    : parsedInputAgent.id === 'warn' ? !!warnHit
-    : parsedInputAgent.id === 'sched' ? !!schedHit
-    : parsedInputAgent.id === 'order' ? !!orderHit
-    : parsedInputAgent.id === 'alert' ? !!alertHit
-    : ['pv'].includes(parsedInputAgent.id) ? !!expoHit
+  const canSend = !!effectiveAgent && qaInput.length > 0 && (
+    effectiveAgent.id === 'query' ? !!queryHit
+    : effectiveAgent.id === 'ops' ? !!opsHit
+    : effectiveAgent.id === 'safe' ? !!safeHit
+    : effectiveAgent.id === 'diag' ? !!diagHit
+    : effectiveAgent.id === 'insp' ? !!inspHit
+    : effectiveAgent.id === 'warn' ? !!warnHit
+    : effectiveAgent.id === 'sched' ? !!schedHit
+    : effectiveAgent.id === 'order' ? !!orderHit
+    : effectiveAgent.id === 'alert' ? !!alertHit
+    : ['pv'].includes(effectiveAgent.id) ? !!expoHit
     : true
   );
 
   const targetAgent = (parsedInputAgent || (selectedAgent && _ABI[selectedAgent])) || null;
-  const chipAgentId = parsedInputAgent?.id || selectedAgent || null;
 
   return (
     <div className="panel dispatch corners"><span className="c1"/>
@@ -1437,17 +1552,8 @@ function QuickFuncs({focusPlant, totalTokens, busyCount}){
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// Excel-backed scrolling sparkline (24 points)
+// Hourly token sparkline (00:00 ~ current hour, normalized slice)
 const SPARK_HOURS = 24;
-const SPARK_TICK_MS = 1200; // 比原先 700ms 略慢
-
-function _normHourlySeries(raw) {
-  if (!raw?.length) return Array.from({ length: SPARK_HOURS }, () => 0.03);
-  const maxV = Math.max(...raw, 1);
-  const norm = raw.map(v => Math.max(0.03, v / maxV));
-  while (norm.length < SPARK_HOURS) norm.push(norm[norm.length - 1] ?? 0.03);
-  return norm.slice(0, SPARK_HOURS);
-}
 
 /** token消耗曲线（小时）：00:00 ~ 当前小时（含），按 slice 归一化 */
 function _tokenHourlySparkToNow(agentId, hourIdx, minuteFrac) {
@@ -1465,18 +1571,33 @@ function _tokenHourlySparkToNow(agentId, hourIdx, minuteFrac) {
   return slice.map(v => Math.max(0.03, v / maxV));
 }
 
-function _excelCallsShape(agentId) {
-  const rec = window.IRUN_AGENT_TOKEN?.byAgentId?.[agentId];
-  return _normHourlySeries(rec?.callsCumulative);
+const SPARK_W = 100;
+const SPARK_H = 32;
+
+function _globalMaxTokenTotal(hourIdx) {
+  const getSnap = window.IRUN_AGENT_TOKEN?.getSnapshot;
+  if (!getSnap) return 1;
+  return Math.max(
+    ..._AGENTS.map(a => {
+      const s = getSnap(a.id, hourIdx);
+      return s?.tokenTotal ?? (parseFloat(String(a.metrics.tokens)) || 0);
+    }),
+    1
+  );
 }
 
-function _tickScrollingSpark(shape, prev, agentIndex) {
-  const hSim = ((Date.now() / 1000) / 5 + agentIndex * 0.7) % SPARK_HOURS;
-  const base = shape[Math.floor(hSim)] ?? shape[shape.length - 1] ?? 0.5;
-  const noise = (Math.random() - 0.5) * 0.1;
-  const last = prev[prev.length - 1];
-  const next = Math.max(0.03, Math.min(1, base * 0.7 + last * 0.2 + noise + 0.05));
-  return [...prev.slice(1), next];
+/** 与 AgentTokenPanel 卡片小曲线一致的折线/面积路径 */
+function _tokenSparkPaths(spark, width, height, agentScale) {
+  const scale = Math.max(0.18, agentScale ?? 1);
+  const data = spark?.length ? spark : [0.03];
+  const xDenom = Math.max(data.length - 1, 1);
+  const polyPts = data.map((v, idx) =>
+    `${(idx / xDenom) * width},${height - 2 - v * scale * (height - 5)}`
+  ).join(' ');
+  return {
+    polyPts,
+    areaPts: `0,${height} ${polyPts} ${width},${height}`,
+  };
 }
 
 // Agent modal — drill into a single agent's working pane
@@ -1493,41 +1614,36 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
     return () => clearInterval(id);
   }, []);
   const hourIdx = now.getHours();
+  const minuteFrac = now.getMinutes() / 60;
   const snap = React.useMemo(
     () => window.IRUN_AGENT_TOKEN?.getSnapshot(agentId, hourIdx) ?? null,
     [agentId, hourIdx]
   );
-  const [trendSpark, setTrendSpark] = useState(() => _excelCallsShape(agentId));
-  useEffect(() => { setTrendSpark(_excelCallsShape(agentId)); }, [agentId, hourIdx]);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setTrendSpark(prev => _tickScrollingSpark(_excelCallsShape(agentId), prev, 0));
-    }, SPARK_TICK_MS);
-    return () => clearInterval(id);
-  }, [agentId]);
+  const trendSpark = React.useMemo(
+    () => _tokenHourlySparkToNow(agentId, hourIdx, minuteFrac),
+    [agentId, hourIdx, minuteFrac]
+  );
+  const globalMaxTok = React.useMemo(() => _globalMaxTokenTotal(hourIdx), [hourIdx]);
+  const tokVal = snap?.tokenTotal ?? 0;
+  const agentScale = tokVal / globalMaxTok;
+  const sparkColor = isBusy ? '#22d3ee' : cat.color;
+  const { polyPts: sparkPolyPts, areaPts: sparkAreaPts } = _tokenSparkPaths(
+    trendSpark, SPARK_W, SPARK_H, agentScale
+  );
   const tokenBarLabels = { reasoning: zh ? '推理' : 'Reason', tool: zh ? '工具' : 'Tools', retrieval: zh ? '检索' : 'Retrieval' };
 
-  // synthetic workflow log
-  const log = useMemo(()=>{
-    const tokenN = Math.floor(Math.random()*900+200);
-    return zh ? [
-      ['09:42:18', '订阅事件总线 · 监听 alert.* 通道'],
-      ['09:42:33', '收到 evt#A203 → 进入分析阶段'],
-      ['09:42:34', '召回 RAG · 3 条相似案例 (相似度 0.91)'],
-      ['09:42:36', '调用工具 plant.metrics.read · 384ms'],
-      ['09:42:37', `生成结论 · 推理 token 消耗 ${tokenN}`],
-      ['09:42:38', '产出工单字段并提交 → ord-agent'],
-      ['09:42:40', '空闲 · 等待下一事件 …'],
-    ] : [
-      ['09:42:18', 'Subscribed event bus · listening on alert.* channel'],
-      ['09:42:33', 'Received evt#A203 → entering analysis'],
-      ['09:42:34', 'RAG recall · 3 similar cases (similarity 0.91)'],
-      ['09:42:36', 'Invoked plant.metrics.read · 384ms'],
-      ['09:42:37', `Synthesised conclusion · reasoning tokens ${tokenN}`],
-      ['09:42:38', 'Emitted ticket fields → ord-agent'],
-      ['09:42:40', 'Idle · waiting next event …'],
-    ];
-  },[agentId, zh]);
+  const workflowRef = useRef(null);
+  const log = React.useMemo(
+    () => buildAgentWorkflowLog(agentId, now, zh),
+    [agentId, now, zh]
+  );
+  useEffect(() => {
+    const el = workflowRef.current;
+    if (!el || !log.length) return;
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    });
+  }, [log, agentId]);
 
   return (
     <div className="modal-bd" onClick={onClose}>
@@ -1536,7 +1652,6 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
         <div className="modal-hd">
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <span className="live" style={{color:cat.color}}>● {isBusy?(zh?'工作中':'Working'):(zh?'待命':'Idle')}</span>
-            <span className="tag-line">AGENT · WORKING PANE</span>
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
             <span className="kbd">ESC</span>
@@ -1584,32 +1699,29 @@ function AgentModal({agentId, onClose, busyMap, onChat}){
           <div>
             <div className="section">
               <h3>{zh?'值班台 · 实时工作流':'Duty Console · Live Workflow'}</h3>
-              <div className="workflow">
-                {log.map((l,i)=>(
+              <div className="workflow" ref={workflowRef}>
+                {log.length ? log.map((l,i)=>(
                   <div key={i} className="ln"><span className="ts">{l[0]}</span><span>{l[1]}</span></div>
-                ))}
+                )) : (
+                  <div className="ln">
+                    <span className="ts">--</span>
+                    <span>{zh ? '空闲 · 等待下一事件 …' : 'Idle · waiting next event …'}</span>
+                  </div>
+                )}
               </div>
             </div>
-            <div className="section" style={{marginTop:18}}>
-              <h3>{zh?'今日趋势 · 调用频次':"Today's Trend · Call Frequency"}</h3>
-              <svg viewBox="0 0 240 80" style={{width:'100%',height:80,marginTop:6}}>
-                <defs>
-                  <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={cat.color} stopOpacity="0.4"/>
-                    <stop offset="100%" stopColor={cat.color} stopOpacity="0"/>
-                  </linearGradient>
-                </defs>
+            <div className="section modal-spark-section">
+              <h3>{zh?'消耗曲线':'Consumption Curve'}</h3>
+              <svg className="modal-spark" viewBox={`0 0 ${SPARK_W} ${SPARK_H}`} preserveAspectRatio="none">
+                <polygon points={sparkAreaPts} fill={sparkColor} fillOpacity="0.13"/>
                 <polyline
-                  fill="none" stroke={cat.color} strokeWidth="1.5"
-                  points={trendSpark.map((v,i)=>`${i*(240/(SPARK_HOURS-1))},${80-v*70}`).join(' ')}
-                  style={{transition:'all .6s ease-out'}}
+                  points={sparkPolyPts}
+                  fill="none"
+                  stroke={sparkColor}
+                  strokeWidth="0.75"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
                 />
-                <polygon
-                  fill="url(#g1)"
-                  points={`0,80 ${trendSpark.map((v,i)=>`${i*(240/(SPARK_HOURS-1))},${80-v*70}`).join(' ')} 240,80`}
-                  style={{transition:'all .6s ease-out'}}
-                />
-                {[0,20,40,60,80].map(y=><line key={y} x1="0" x2="240" y1={y} y2={y} stroke="rgba(120,160,220,0.05)"/>)}
               </svg>
             </div>
             <div className="section" style={{marginTop:18}}>
@@ -1680,12 +1792,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
     () => _AGENTS.map(a => (getSnap ? getSnap(a.id, hourIdx) : null)),
     [hourIdx, getSnap]
   );
-  const GLOBAL_MAX_TOK = Math.max(
-    ...agentSnaps.map((s, i) => s?.tokenTotal ?? (parseFloat(String(_AGENTS[i].metrics.tokens)) || 0)),
-    1
-  );
-
-  const W = 100, H = 32;
+  const GLOBAL_MAX_TOK = React.useMemo(() => _globalMaxTokenTotal(hourIdx), [hourIdx]);
 
   // duplicate the agent list for seamless infinite scroll
   const list = [..._AGENTS, ..._AGENTS];
@@ -1707,12 +1814,8 @@ function AgentTokenPanel({ busyMap, onOpen }) {
             const peakH = snap?.peakHour;
             const color = busy ? '#22d3ee' : cat.color;
             const tokVal = snap?.tokenTotal ?? 0;
-            const agentScale = Math.max(0.18, tokVal / GLOBAL_MAX_TOK);
-            const xDenom = Math.max(spark.length - 1, 1);
-            const polyPts = spark.map((v, idx) =>
-              `${(idx / xDenom) * W},${H - 2 - v * agentScale * (H - 5)}`
-            ).join(' ');
-            const areaPts = `0,${H} ${polyPts} ${W},${H}`;
+            const agentScale = tokVal / GLOBAL_MAX_TOK;
+            const { polyPts, areaPts } = _tokenSparkPaths(spark, SPARK_W, SPARK_H, agentScale);
             return (
               <div key={`${a.id}-${dupIdx}`}
                    className={`token-card${busy ? ' busy' : ''}`}
@@ -1726,7 +1829,7 @@ function AgentTokenPanel({ busyMap, onOpen }) {
                   </div>
                   <span className="tc-tok">{snap?.tokensText ?? a.metrics.tokens}</span>
                 </div>
-                <svg className="tc-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+                <svg className="tc-spark" viewBox={`0 0 ${SPARK_W} ${SPARK_H}`} preserveAspectRatio="none">
                   <polygon points={areaPts} fill={color} fillOpacity="0.13"/>
                   <polyline points={polyPts} fill="none" stroke={color} strokeWidth="0.75" strokeLinejoin="round" strokeLinecap="round"/>
                 </svg>
@@ -1926,14 +2029,21 @@ function PlantTitle({plant, plants, onChange}){
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// DroneFlight — triggered only by clicking the UAV button (AgentsRail).
-//  · JOHOR-COMMERCIAL (id 1881233694553112576): flies a serpentine inspection
-//    route over the rooftop PV arrays, one round trip (there & back), then fades
-//    out — rendered with the robotField static-drone icon style.
-//  · Overview / all other plants: keeps the original behaviour — ellipse loop ×2
-//    then flies off, with the original glowing icon + shadow.
+// UAVStaticIcon — wrj001.png + UAV badge; shared by field overlay & DroneFlight
+function UAVStaticIcon(){
+  return (
+    <>
+      <img src="wrj001.png" alt="UAV"/>
+      <div className="paf-badge paf-badge-drone">UAV</div>
+    </>
+  );
+}
+
+// DroneFlight — UAV 按钮单次巡飞；UAV 演示站 img2 下 loop 持续循环。
+//  · JOHOR (1881233694553112576): 屋顶蛇形往返航线
+//  · 其余电站: 椭圆航线（loop 时无限循环，否则 ×2 后飞出）
 const JOHOR_PLANT_ID = '1881233694553112576';
-function DroneFlight({onDone, plant}){
+function DroneFlight({onDone, plant, loop=false}){
   const isJohor = plant?.id === JOHOR_PLANT_ID;
   const [pos, setPos] = useState(isJohor
     ? {x: 326, y: 756, opacity: 0, rot: 0}
@@ -1942,23 +2052,22 @@ function DroneFlight({onDone, plant}){
   const rafRef = useRef(null);
 
   useEffect(()=>{
+    startRef.current = null;
     let tick;
     if(isJohor){
       // ── Serpentine round-trip over JOHOR-COMMERCIAL rooftop (1920×1080 space) ──
-      // Traces the red line: lower-left start → waves across front roof →
-      // sharp peak over the building gap → rise to far-right end near OPS.
       const fwd = [
         [326, 756], [460, 730], [560, 668], [660, 720], [770, 660],
         [880, 712], [960, 540], [1075, 668], [1248, 565], [1421, 486],
       ];
-      const path = fwd.concat(fwd.slice(0, -1).reverse());  // forward then back
+      const path = fwd.concat(fwd.slice(0, -1).reverse());
       const segLen = [];
       let total = 0;
       for(let i=1;i<path.length;i++){
         const d = Math.hypot(path[i][0]-path[i-1][0], path[i][1]-path[i-1][1]);
         segLen.push(d); total += d;
       }
-      const travelDur = 11;   // seconds for the full round trip
+      const travelDur = 11;
       const fadeIn = 0.5, fadeOut = 0.9;
       const sample = (dist) => {
         let d = dist, i = 0;
@@ -1973,23 +2082,29 @@ function DroneFlight({onDone, plant}){
       tick = (tm) => {
         if(!startRef.current) startRef.current = tm;
         const elapsed = (tm - startRef.current) / 1000;
-        if(elapsed >= travelDur){ onDone?.(); return; }
-        const {x, y} = sample((elapsed / travelDur) * total);
+        if(!loop && elapsed >= travelDur){ onDone?.(); return; }
+        const cycleT = loop ? (elapsed % travelDur) : elapsed;
+        const {x, y} = sample((cycleT / travelDur) * total);
         let opacity = 1;
         if(elapsed < fadeIn) opacity = elapsed / fadeIn;
-        else if(elapsed > travelDur - fadeOut) opacity = Math.max(0, (travelDur - elapsed) / fadeOut);
+        else if(!loop && elapsed > travelDur - fadeOut) opacity = Math.max(0, (travelDur - elapsed) / fadeOut);
         setPos({x, y, opacity, rot: 0});
         rafRef.current = requestAnimationFrame(tick);
       };
     } else {
-      // ── Original ellipse: loop ×2 then fly off up-right ──
       const cx = 960, cy = 540, rx = 720, ry = 300;
       const loopDur = 5.5, totalLoops = 2, fadeIn = 0.4, exitDur = 1.8;
       const totalDur = totalLoops * loopDur + exitDur;
       tick = (t) => {
         if(!startRef.current) startRef.current = t;
         const elapsed = (t - startRef.current) / 1000;
-        if(elapsed < totalLoops * loopDur){
+        if(loop){
+          const theta = -Math.PI/2 + ((elapsed % loopDur) / loopDur) * Math.PI * 2;
+          const x = cx + rx * Math.cos(theta);
+          const y = cy + ry * Math.sin(theta);
+          setPos({x, y, opacity: elapsed < fadeIn ? elapsed / fadeIn : 1, rot: 0});
+          rafRef.current = requestAnimationFrame(tick);
+        } else if(elapsed < totalLoops * loopDur){
           const theta = -Math.PI/2 + (elapsed / loopDur) * Math.PI * 2;
           const x = cx + rx * Math.cos(theta);
           const y = cy + ry * Math.sin(theta);
@@ -2013,7 +2128,7 @@ function DroneFlight({onDone, plant}){
     }
     rafRef.current = requestAnimationFrame(tick);
     return ()=>{ if(rafRef.current) cancelAnimationFrame(rafRef.current); };
-  },[]);
+  },[loop, isJohor, onDone]);
 
   // Icon is always the robotField static-drone style (upright + UAV badge);
   // only the flight route differs (serpentine for JOHOR, ellipse for others).
@@ -2025,8 +2140,7 @@ function DroneFlight({onDone, plant}){
            opacity: pos.opacity,
            transform: 'translate(-50%,-50%)'
          }}>
-      <img src="wrj001.png" alt="UAV"/>
-      <div className="paf-badge paf-badge-drone">UAV</div>
+      <UAVStaticIcon/>
     </div>
   );
 }
@@ -2174,7 +2288,7 @@ function DispatchedRobot({id, agentId, text, onDone}){
         <div className={`pr-bubble${st.facingLeft?'':' flip'}`}>
           <div className="pr-bubble-head">
             <span className="pr-bubble-code">{ag.code}</span>
-            <span className="pr-bubble-tag">执行</span>
+            <span className="pr-bubble-tag"><T z="执行" e="Execute"/></span>
           </div>
           <div className="pr-bubble-text">{text}</div>
         </div>
@@ -2281,7 +2395,7 @@ function PlantAgentField({plant, busyMap, cur}){
   const l = useLang(); const zh = l !== 'en';
   if (!plant?.robotField?.length) return null;
   const unavailableAgentIds = new Set(getDemoPlantTeamUnavailableIds(plant?.id));
-  const visibleRobots = plant.robotField.filter(r => !r.anchorOnly && !unavailableAgentIds.has(r.agent));
+  const visibleRobots = plant.robotField.filter(r => !r.anchorOnly && !unavailableAgentIds.has(r.agent) && r.agent !== 'drone');
   if (!visibleRobots.length) return null;
   // Bubble on a visible robot: prefer handoff target (e.g. drone→insp shows on insp)
   const visibleIds = new Set(visibleRobots.map(r => r.agent));
@@ -2294,8 +2408,10 @@ function PlantAgentField({plant, busyMap, cur}){
   plant.robotField.forEach(r => {
     if (!unavailableAgentIds.has(r.agent)) posMap[r.agent] = {x: r.x, y: r.y};
   });
-  const fromPos = cur && posMap[cur.from];
-  const toPos = cur && posMap[cur.to];
+  // 无人机步骤不在场域画连线/光点 — UAV 由 DroneFlight 独立层展示
+  const droneStep = cur && (cur.from === 'drone' || cur.to === 'drone');
+  const fromPos = !droneStep && cur && posMap[cur.from];
+  const toPos = !droneStep && cur && posMap[cur.to];
   const lineColor = !cur ? '#22d3ee'
                   : cur.type === 'action' ? '#fbbf24'
                   : isSafetyStep(cur) ? '#f87171'
@@ -2335,16 +2451,6 @@ function PlantAgentField({plant, busyMap, cur}){
         </>
       )}
       {visibleRobots.map((r, i) => {
-        // 无人机：robotField 静态 UAV 图标（wrj001.png + UAV 徽标），_ABI 无此 agent
-        if (r.agent === 'drone') {
-          return (
-            <div key="drone" className="paf-drone"
-                 style={{left:`${r.x}%`, top:`${r.y}%`, animationDelay:`${i*0.3}s`}}>
-              <img src="wrj001.png" alt="UAV"/>
-              <div className="paf-badge paf-badge-drone">UAV</div>
-            </div>
-          );
-        }
         const ag = _ABI[r.agent];
         if (!ag) return null;
         const active = !!(busyMap && busyMap[r.agent]);
@@ -2603,8 +2709,8 @@ function AgentsRail({focusPlant, busyMap, selected, onSelect, onOpen, onSkillOpe
 
       {/* drone fly button */}
       <div className={`drone-btn${droneActive?' active':''}`}
-           onClick={()=>{ if(!droneActive) onDroneFly?.(); }}
-           title={zh?'无人机起飞':'Launch UAV'}>
+           onClick={()=> onDroneFly?.()}
+           title={droneActive ? (zh?'关闭无人机飞行':'Stop UAV') : (zh?'无人机起飞':'Launch UAV')}>
         <div className="drone-btn-icon">
           <img src="wrj001.png" alt="UAV"/>
         </div>

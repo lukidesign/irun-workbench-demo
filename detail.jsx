@@ -13,7 +13,10 @@ function getPlantTeamUnavailableIds(plant) {
 const { LangCtx: _D_LANG } = window.IRUN_UI || {};
 const _useD_Lang = () => React.useContext(_D_LANG || React.createContext('zh'));
 
-function stepText(s, zh) { return zh ? s.text : (s.en || s.text); }
+function stepText(s, zh) {
+  const raw = zh ? s.text : (s.en || s.text);
+  return window.IRUN?.resolveDemoIds?.(raw, window.IRUN?.getDemoBaseTime?.()) ?? raw;
+}
 function stepTag(s, zh) { return zh ? s.tag : (s.entag || s.tag); }
 function scenarioTitle(s, zh) { return zh ? s.title : (s.enTitle || s.title); }
 function isSafetyStep(s) { return s?.tag === '安全' || s?.entag === 'Safety'; }
