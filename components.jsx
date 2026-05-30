@@ -2335,6 +2335,16 @@ function PlantAgentField({plant, busyMap, cur}){
         </>
       )}
       {visibleRobots.map((r, i) => {
+        // 无人机：robotField 静态 UAV 图标（wrj001.png + UAV 徽标），_ABI 无此 agent
+        if (r.agent === 'drone') {
+          return (
+            <div key="drone" className="paf-drone"
+                 style={{left:`${r.x}%`, top:`${r.y}%`, animationDelay:`${i*0.3}s`}}>
+              <img src="wrj001.png" alt="UAV"/>
+              <div className="paf-badge paf-badge-drone">UAV</div>
+            </div>
+          );
+        }
         const ag = _ABI[r.agent];
         if (!ag) return null;
         const active = !!(busyMap && busyMap[r.agent]);

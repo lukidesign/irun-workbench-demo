@@ -109,7 +109,7 @@ const PLANTS = [
       { agent:'sched', x:65, y:50 },  // 排程 — 中排右·资源排程
       { agent:'safe',  x:81, y:50 },  // 安全 — 中排最右·水上作业安全
       { agent:'pv',    x:55, y:61 },  // 光伏助手 — 下排中央·现场支持
-      { agent:'drone', x:43, y:45, anchorOnly: true },  // 无人机起降锚点 — 仅连线用，不渲染图标
+      { agent:'drone', x:50, y:50 },  // 无人机 — 阵列正中央·静态 UAV 图标（兼作连线锚点）
     ],
   },
 
@@ -130,7 +130,7 @@ const PLANTS = [
       { agent:'diag',  x:35, y:38 },
       { agent:'insp',  x:48, y:35 },
       { agent:'sched', x:57, y:32 },
-      { agent:'drone', x:64, y:29 },
+      { agent:'drone', x:64, y:29, anchorOnly: true },
       { agent:'ops',   x:69, y:37 },
       { agent:'query', x:65, y:41 },
       { agent:'order', x:56, y:42 },
