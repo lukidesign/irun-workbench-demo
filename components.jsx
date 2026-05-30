@@ -759,7 +759,7 @@ function resolveAgentReply(text, agentId, plant, zh) {
   return { stream: false, text: respondTo(text, agentId, plant) };
 }
 
-function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAgent, onClearDispatchPlantCtx, onOpenAgent, onCollapse, mode, onDispatchCommand}){
+function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAgent, onClearDispatchPlantCtx, onOpenAgent, onCollapse, mode, onDispatchCommand, onDispatchToPlant, onRecallDispatch}){
   const [sessions, setSessions] = useState(_SESSIONS_SEED);
   const [currentId, setCurrentId] = useState('s_cur');
   const [input, setInput] = useState('');
@@ -862,7 +862,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
   }
   function deleteSession(id, e){
     e?.stopPropagation();
-    if (currentId === id) streamAbortRef.current?.abort?.();
+    if (currentId === id){ streamAbortRef.current?.abort?.(); onRecallDispatch?.(); }  // 删除当前会话 → 召回
     setSessions(prev => {
       const next = prev.filter(s => s.id !== id);
       // ensure there's always at least one session
@@ -895,6 +895,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
 
   function selectSession(id){
     streamAbortRef.current?.abort?.();
+    if (id !== currentId) onRecallDispatch?.();   // 切换会话 → 召回派发机器人
     setCurrentId(id);
     setHistoryOpen(false);
     setInput('');
@@ -903,6 +904,7 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
 
   function newSession(){
     streamAbortRef.current?.abort?.();
+    onRecallDispatch?.();   // 新建会话（= 清空当前对话）→ 召回派发机器人
     const id = 's_' + Date.now();
     const now = new Date();
     const p = n => String(n).padStart(2,'0');
@@ -982,6 +984,19 @@ function DispatchPanel({focusPlant, dispatchPlantCtx, selectedAgent, onSelectAge
     if (mode === 'command' && onDispatchCommand){
       const cleanText = stripAgentPrefix(text);
       onDispatchCommand(targetId, cleanText || text);
+    }
+
+    // Overview-page dispatch：识别「@机器人 + 电站名」→ 派一个机器人走向该电站 pin
+    // （是否真正出现/换站/忽略由 App 端按当前租户判定）
+    if (onDispatchToPlant){
+      const pName = extractPlantNameFromInput(text)
+        || (plantCtx && text.includes(plantCtx.name) ? plantCtx.name : '');
+      if (pName){
+        const tp = String(pName).trim();
+        const plant = (window.IRUN?.PLANTS || []).find(p =>
+          p.name === tp || p.enName === tp || p.short === tp);
+        if (plant) onDispatchToPlant({ sessionId: currentId, plantId: plant.id, agentId: targetId });
+      }
     }
 
     const reply = resolveAgentReply(text, targetId, plantCtx, zh);
@@ -2179,6 +2194,84 @@ function DispatchedRobots({robots, onRobotDone}){
   );
 }
 
+// ── OverviewDispatchRobot ─────────────────────────────────────────────
+// 总览页(map2) 派发机器人：从右下角走到电站 pin 停驻，recall=true 时原路返回并淡出。
+// 生命周期由 App 的会话事件驱动（派出/换站/召回），与 3 个巡逻机器人互不影响。
+const OVB_START = { x: 95, y: 90 };  // 右下角起点（% of 1920×1080 画布）
+const OVB_PARK_DX = 1;               // 停驻点相对 pin 的横向偏移（轻微避让圆点）
+const OVB_PARK_DY = 1;               // 停驻点相对 pin 的纵向下移
+function OverviewDispatchRobot({ botKey, plant, recall, onDone }){
+  const pin = { x: parseFloat(plant.mapX), y: parseFloat(plant.mapY) };
+  // 停驻点偏到"远离屏幕边"的一侧：pin 在右半区→往左偏，否则往右偏；并略微下移
+  const parkSide = pin.x > 50 ? -1 : 1;   // -1 左 / +1 右
+  const target = { x: pin.x + parkSide * OVB_PARK_DX, y: pin.y + OVB_PARK_DY };
+  const [st, setSt] = useState({ x: OVB_START.x, y: OVB_START.y, faceRight: false, opacity: 0 });
+  const [parked, setParked] = useState(false);
+  const rafRef = useRef(null);
+  const recallRef = useRef(recall);
+  recallRef.current = recall;
+
+  useEffect(() => {
+    const WALK = 4.2;           // s — 单程步行时长
+    const lerp = (a, b, u) => a + (b - a) * u;
+    const ease = (u) => (u < 0.5 ? 2*u*u : 1 - Math.pow(-2*u+2, 2)/2);
+
+    let phase = 'going';        // going | parked | returning
+    let phaseStart = null;
+    let from = { ...OVB_START };
+    let to = { ...target };
+    let cur = { ...OVB_START };
+
+    const tick = (t) => {
+      if (phaseStart == null) phaseStart = t;
+      const el = (t - phaseStart) / 1000;
+
+      if (phase === 'going') {
+        const u = Math.min(1, el / WALK);
+        const e = ease(u);
+        cur = { x: lerp(from.x, to.x, e), y: lerp(from.y, to.y, e) };
+        setSt({ x: cur.x, y: cur.y, faceRight: to.x > from.x, opacity: Math.min(1, el/0.5) });
+        if (recallRef.current) {                       // 途中被召回 → 立即从当前点折返
+          phase = 'returning'; phaseStart = t; from = { ...cur }; to = { ...OVB_START };
+        } else if (u >= 1) {
+          phase = 'parked'; phaseStart = t; setParked(true);
+        }
+      } else if (phase === 'parked') {
+        if (recallRef.current) {                        // 停驻中收到召回 → 原路返回
+          setParked(false);
+          phase = 'returning'; phaseStart = t; from = { ...target }; to = { ...OVB_START };
+        }
+        // 停驻期间位置固定，不重复 setSt，避免空转 re-render
+      } else if (phase === 'returning') {
+        const u = Math.min(1, el / WALK);
+        const e = ease(u);
+        cur = { x: lerp(from.x, to.x, e), y: lerp(from.y, to.y, e) };
+        const opacity = u > 0.7 ? Math.max(0, 1 - (u-0.7)/0.3) : 1;
+        setSt({ x: cur.x, y: cur.y, faceRight: to.x > from.x, opacity });
+        if (u >= 1) { onDone?.(botKey); return; }
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, []);
+
+  return (
+    <div className={`overview-dispatch-robot${parked ? ' parked' : ''}`}
+         style={{ left: st.x + '%', top: st.y + '%', opacity: st.opacity }}>
+      {parked && (
+        <>
+          <div className="odr-halo"/>
+          <div className="odr-halo odr-halo-2"/>
+        </>
+      )}
+      <div className="patrol-robot-sprite"
+           style={{ transform: st.faceRight ? 'scaleX(-1)' : 'scaleX(1)' }}/>
+      <div className="patrol-robot-shadow"/>
+    </div>
+  );
+}
+
 // ── PlantAgentField ───────────────────────────────────────────────────
 // Renders a fleet of static RobotAvatars at plant.robotField positions.
 // Active agents (busyMap hit) glow + lift. Used in img2 when a plant
@@ -2269,7 +2362,7 @@ function PlantAgentField({plant, busyMap, cur}){
   );
 }
 
-window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, PlantAgentField, DispatchedRobots, useClock, fmtTime, fmtDate, fmtDateTime, LangCtx };
+window.IRUN_UI = { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, RobotAvatar, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, PlantAgentField, DispatchedRobots, OverviewDispatchRobot, useClock, fmtTime, fmtDate, fmtDateTime, LangCtx };
 
 // ──────────────────────────────────────────────────────────────────────
 // Collapsed event-stream tab — vertical handle on the left

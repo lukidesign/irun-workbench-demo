@@ -1,7 +1,7 @@
 // iRun Workbench — App root
 const { useState: _aUseState, useEffect: _aUseEffect, useCallback: _aUseCallback } = React;
 const useState = _aUseState, useEffect = _aUseEffect, useCallback = _aUseCallback;
-const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, PlantAgentField, DispatchedRobots, LangCtx } = window.IRUN_UI;
+const { TopBar, EventStream, EventStreamTab, DispatchPanel, DispatchTab, AgentDock, AgentTokenPanel, MiniMap, QuickFuncs, AgentModal, AgentsRail, ModeStrip, SkillModal, PlantTitle, DroneFlight, PlantRobot, PlantAgentField, DispatchedRobots, OverviewDispatchRobot, LangCtx } = window.IRUN_UI;
 const { PlantsMap, Map2Overlay } = window.IRUN_MAP;
 const { PlantDetail, PlantInlineDock, useScenarioStepping } = window.IRUN_DETAIL;
 const { Scene3D } = window.IRUN_SCENE3D;
@@ -42,12 +42,38 @@ function App(){
   const [map2SubMode, setMap2SubMode] = useState(() => {
     try { return (localStorage.getItem('irun:theme') || 'light') === 'light' ? 'pic1' : 'show'; } catch(e) { return 'pic1'; }
   });
-  // Switching tenant → drop focus & return to OVERVIEW
+  // ── Overview dispatch robots (map2) ──────────────────────────────────
+  // 每条 = { key, plantId, agentId, recall }。同时最多 1 个 active(recall=false)；
+  // 旧的被换站/召回时置 recall=true → 组件播放原路返回动画后 onDone 移除自己。
+  const [overviewBots, setOverviewBots] = useState([]);
+  const recallAllBots = useCallback(() => {
+    setOverviewBots(prev => prev.map(b => b.recall ? b : { ...b, recall: true }));
+  }, []);
+  // 派出 / 换站：识别到 @机器人 + 当前租户内电站名后由 DispatchPanel 调用
+  const onDispatchToPlant = useCallback(({ plantId, agentId }) => {
+    const plant = (window.IRUN?.PLANTS || []).find(p => p.id === plantId);
+    if (!plant) return;
+    if (plant.tenant !== tenant.id) return;        // 非当前租户 → 不出现机器人
+    if (!plant.mapX || !plant.mapY) return;        // 无 pin 坐标 → 无终点
+    setOverviewBots(prev => {
+      const active = prev.find(b => !b.recall);
+      if (active && active.plantId === plantId) return prev;  // 同站，不动
+      const recalled = prev.map(b => b.recall ? b : { ...b, recall: true });  // 旧的原路返回
+      const key = `ob-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+      return [...recalled, { key, plantId, agentId, recall: false }];
+    });
+  }, [tenant]);
+  const onOverviewBotDone = useCallback((key) => {
+    setOverviewBots(prev => prev.filter(b => b.key !== key));
+  }, []);
+
+  // Switching tenant → drop focus & return to OVERVIEW, recall any bot
   const onTenantChange = useCallback((idx) => {
     setTenantIdx(idx);
     setFocusId(null);
     setViewMode(prev => prev === 'img2' ? 'map2' : prev);
-  }, []);
+    recallAllBots();
+  }, [recallAllBots]);
   // Plants visible under the current tenant
   const tenantPlants = plants.filter(p => p.tenant === tenant.id);
   const tenantAgg = APP_AGG_OF ? APP_AGG_OF(tenantPlants) : { plants: tenantPlants.length, capacity:0, power:0, gen:0, alerts:0, risk:0 };
@@ -365,6 +391,13 @@ function App(){
         />
       )}
 
+      {/* overview dispatch robots — walk bottom-right → plant pin, park, then retrace */}
+      {viewMode === 'map2' && overviewBots.map(b => {
+        const plant = tenantPlants.find(p => p.id === b.plantId);
+        if (!plant) return null;
+        return <OverviewDispatchRobot key={b.key} botKey={b.key} plant={plant} recall={b.recall} onDone={onOverviewBotDone}/>;
+      })}
+
       {/* map2 toggle — theme-aware:
             light → 图1 / 图2 (qian backgrounds)
             dark  → 展示 / 漫游 (rjgf001 + manyou001) */}
@@ -398,7 +431,7 @@ function App(){
           <div className={`right-rail ${dispatchCollapsed?'collapsed':''}`}>
             {dispatchCollapsed
               ? <DispatchTab onExpand={()=>toggleDispatch(false)}/>
-              : <DispatchPanel focusPlant={focusPlant} dispatchPlantCtx={dispatchPlantCtx} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onClearDispatchPlantCtx={()=>setDispatchPlantCtx(null)} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)} mode={mode} onDispatchCommand={onDispatchCommand}/>
+              : <DispatchPanel focusPlant={focusPlant} dispatchPlantCtx={dispatchPlantCtx} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} onClearDispatchPlantCtx={()=>setDispatchPlantCtx(null)} onOpenAgent={setOpenAgent} onCollapse={()=>toggleDispatch(true)} mode={mode} onDispatchCommand={onDispatchCommand} onDispatchToPlant={onDispatchToPlant} onRecallDispatch={recallAllBots}/>
             }
           </div>
         )}

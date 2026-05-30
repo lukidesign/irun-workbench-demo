@@ -1315,16 +1315,46 @@ body{
   50%{opacity:0.55;transform:translateX(-50%) scale(0.78)}
 }
 
+/* ------ overview 派发机器人（map2 总览页，由对话调度触发） ------ */
+.overview-dispatch-robot{
+  position:absolute;
+  width:170.6px;height:96px;
+  transform:translate(-50%,-50%);   /* left/top 定位机器人中心 */
+  pointer-events:none;
+  z-index:7;
+  filter:drop-shadow(0 0 8px rgba(34,211,238,0.7)) drop-shadow(0 0 18px rgba(34,211,238,0.38));
+  will-change:left,top,opacity;
+  transition:opacity .2s linear;
+}
+/* 停驻时：地面扩散光环（方案 B）— 脚下青色圆环由小到大向外扩散淡出 */
+.odr-halo{
+  position:absolute;left:50%;bottom:6px;
+  width:64px;height:20px;
+  transform:translateX(-50%);
+  border:1.5px solid var(--cyan);
+  border-radius:50%;
+  opacity:0;
+  box-shadow:0 0 10px rgba(34,211,238,0.6);
+  animation:odr-halo-spread 2s ease-out infinite;
+  pointer-events:none;
+}
+.odr-halo-2{ animation-delay:1s; }   /* 第二环错相位 → 连续不断的扩散感 */
+@keyframes odr-halo-spread{
+  0%   {opacity:0;   transform:translateX(-50%) scale(0.35)}
+  15%  {opacity:0.9;}
+  100% {opacity:0;   transform:translateX(-50%) scale(1.6)}
+}
+
 /* path 1 — 左侧红圈（Perak 下方跑道）· 中心 ~33%,62% 椭圆循环 */
 .patrol-robot-1{
   animation:patrol-path-1 14s linear infinite;
 }
 @keyframes patrol-path-1{
-  0%   {left:28%;top:52%}
-  25%  {left:33%;top:48%}
-  50%  {left:38%;top:52%}
-  75%  {left:33%;top:56%}
-  100% {left:28%;top:52%}
+  0%   {left:16%;top:42%}
+  25%  {left:21%;top:38%}
+  50%  {left:26%;top:42%}
+  75%  {left:21%;top:46%}
+  100% {left:16%;top:42%}
 }
 
 /* path 2 — 中下红圈（Johor 下方光伏）· 中心 ~43%,82% 椭圆循环 */
