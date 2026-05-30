@@ -371,7 +371,7 @@ function SceneLog({scenario, steps, plant}){
           return (
             <div key={i} className="ln">
               <div className="hd">
-                <span>T+{(s.t/1000).toFixed(1)}s</span>
+                <span>{getStepTimeLabel(s, scenario)}</span>
                 <b>{fromName}</b>
                 <span>→</span>
                 <b style={{color: s.type==='handoff'?'#a78bfa':'var(--cyan)'}}>{toName}</b>
@@ -569,6 +569,24 @@ function formatStepDate(dateStr) {
   return `${m[1]}-${m[2]} ${m[3]}:${m[4]}`;
 }
 
+function getStepTimeLabel(step, scenario) {
+  if (step.date) return formatStepDate(step.date);
+  let baseMs;
+  if (scenario?.startDate) {
+    baseMs = new Date(String(scenario.startDate).replace(' ', 'T')).getTime();
+  } else {
+    const firstDated = (scenario?.steps || []).find(s => s.date);
+    if (firstDated) {
+      baseMs = new Date(String(firstDated.date).replace(' ', 'T')).getTime() - (firstDated.t || 0);
+    } else {
+      baseMs = (window.IRUN?.getDemoBaseTime?.() || new Date()).getTime();
+    }
+  }
+  const d = new Date(baseMs + (step.t || 0));
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 // ── Card 3: Multi-agent collaboration log (auto-scroll)
 function PIDCardLog({scenario, steps, isStandard}){
   const zh = _useD_Lang() !== 'en';
@@ -594,7 +612,7 @@ function PIDCardLog({scenario, steps, isStandard}){
           const toName = zh
             ? (to?.short || _NAME_MAP_CN[s.to] || s.to)
             : (to?.en    || _NAME_MAP_EN[s.to] || s.to);
-          const timeLabel = s.date ? formatStepDate(s.date) : `T+${(s.t/1000).toFixed(1)}s`;
+          const timeLabel = getStepTimeLabel(s, scenario);
           return (
             <div key={i} className="pid-log-ln">
               <div className="pid-log-hd">
