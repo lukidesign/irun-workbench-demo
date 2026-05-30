@@ -642,13 +642,18 @@ function PIDCardScene({plant, scenario, stepIdx, cur, busyMap, isStandard}){
   let posMap = {};
   let sceneNodes = [];
 
+  const anchorInCurrentStep = (agent) =>
+    !!(cur && (cur.from === agent || cur.to === agent));
+
   if (useRobotField) {
     plant.robotField.forEach(r => {
       if (!unavailableAgentIds.has(r.agent)) posMap[r.agent] = { x: r.x, y: r.y };
     });
     sceneNodes = plant.robotField
-      .filter(r => !r.anchorOnly && !unavailableAgentIds.has(r.agent) && _D_ABI[r.agent])
-      .map(r => ({ id: r.agent, pos: posMap[r.agent] }));
+      .filter(r => !unavailableAgentIds.has(r.agent))
+      .filter(r => !r.anchorOnly || anchorInCurrentStep(r.agent))
+      .filter(r => r.agent === 'drone' || _D_ABI[r.agent])
+      .map(r => ({ id: r.agent, pos: posMap[r.agent], anchorOnly: !!r.anchorOnly }));
   } else {
     sceneNodes = Object.entries(NODE_POS)
       .filter(([id]) => id !== 'plant')
@@ -685,7 +690,9 @@ function PIDCardScene({plant, scenario, stepIdx, cur, busyMap, isStandard}){
       });
   const displayPosMap = {};
   Object.entries(posMap).forEach(([id, pos]) => { displayPosMap[id] = spreadPos(pos); });
-  const displaySceneNodes = sceneNodes.map(({ id, pos }) => ({ id, pos: displayPosMap[id] || pos }));
+  const displaySceneNodes = sceneNodes.map(({ id, pos, anchorOnly }) => ({
+    id, anchorOnly, pos: displayPosMap[id] || pos,
+  }));
 
   const fromPos = cur && displayPosMap[cur.from];
   const toPos = cur && displayPosMap[cur.to];
@@ -745,14 +752,14 @@ function PIDCardScene({plant, scenario, stepIdx, cur, busyMap, isStandard}){
                  }}/>
           </>
         )}
-        {displaySceneNodes.map(({ id, pos }) => {
+        {displaySceneNodes.map(({ id, pos, anchorOnly }) => {
           const cat = getCat(id);
           const isActive = !!(busyMap && busyMap[id]);
           const ag = _D_ABI[id];
           const code = ag?.code || (id === 'field' ? 'FLD' : id === 'drone' ? 'UAV' : 'XX');
           return (
             <div key={id}
-                 className={`pid-scene-node${isActive ? ' active' : ''}`}
+                 className={`pid-scene-node${isActive ? ' active' : ''}${anchorOnly ? ' pid-scene-uav' : ''}`}
                  style={{ left: pos.x + '%', top: pos.y + '%', '--cat-color': cat.color }}>
               <div className="pid-sn-circle" style={{ color: cat.color, background: isActive ? 'rgba(34,211,238,0.16)' : 'rgba(6,10,22,0.85)' }}>
                 {code}

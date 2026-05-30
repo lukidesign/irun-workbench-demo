@@ -85,6 +85,8 @@ function fmtDateTimeMinute(d){
   const p = n => String(n).padStart(2,'0');
   return `${fmtDate(d)} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+const GLOBAL_EVENT_SPAN_MS = 2 * 24 * 60 * 60 * 1000;
+
 function resolveEventTime(tpl) {
   if (tpl.date) {
     const t = new Date(tpl.date.replace(' ', 'T'));
@@ -97,12 +99,26 @@ function resolveEventTime(tpl) {
   }
   return new Date();
 }
-function buildGlobalEvents(now) {
+/** 按模板顺序在近 2 天内均匀分配时间，最后一条对齐当前时刻（不超过 now） */
+function assignGlobalEventTime(index, total, now) {
   const cutoff = now.getTime();
-  return [..._GET]
-    .map((tpl, i) => ({ id: `global-${i}`, ...tpl, _time: resolveEventTime(tpl) }))
-    .filter(e => e._time.getTime() <= cutoff)
-    .sort((a, b) => a._time.getTime() - b._time.getTime());
+  const t = new Date(cutoff);
+  t.setSeconds(0, 0);
+  if (total <= 1) return t;
+  const start = cutoff - GLOBAL_EVENT_SPAN_MS;
+  const ms = Math.min(start + (index / (total - 1)) * GLOBAL_EVENT_SPAN_MS, cutoff);
+  const out = new Date(ms);
+  out.setSeconds(0, 0);
+  return out.getTime() > cutoff ? t : out;
+}
+function buildGlobalEvents(now) {
+  const total = _GET.length;
+  return [..._GET].map((tpl, i) => ({
+    id: `global-${i}`,
+    _idx: i,
+    ...tpl,
+    _time: assignGlobalEventTime(i, total, now),
+  }));
 }
 function derivePlantStreamTag(plant) {
   if (!plant) return null;
@@ -127,14 +143,16 @@ function eventMatchesPlant(evt, plant) {
   return evtTag.toLowerCase() === plantTag.toLowerCase();
 }
 function buildAgentWorkflowLog(agentId, now, zh) {
+  const total = _GET.length;
   return _GET
-    .filter(tpl => tpl.agent === agentId)
-    .map(tpl => ({
-      time: resolveEventTime(tpl),
+    .map((tpl, i) => ({
+      _idx: i,
+      agent: tpl.agent,
+      time: assignGlobalEventTime(i, total, now),
       text: (!zh && tpl.en) ? tpl.en : tpl.text,
     }))
-    .filter(e => e.time.getTime() <= now.getTime())
-    .sort((a, b) => a.time.getTime() - b.time.getTime())
+    .filter(e => e.agent === agentId)
+    .sort((a, b) => a._idx - b._idx)
     .map(e => [fmtDateTimeMinute(e.time), e.text]);
 }
 
@@ -402,7 +420,7 @@ function EventStream({onCollapse, focusPlant}){
     let cur = seed;
     setVisibleCount(cur);
 
-    const revealMs = 2800;
+    const revealMs = 2200;
     const pauseMs = 3000;
     let pausing = false;
 
