@@ -1339,16 +1339,35 @@ body{
   100% {left:38%;top:72%}
 }
 
-/* path 3 — 右侧红圈（Melaka 旁绿地）· 中心 ~80%,60% 椭圆循环 */
+/* path 3 — 右侧红圈（Penang-Commercial 旁绿地）· 中心 ~85%,60% 横向扁椭圆 */
 .patrol-robot-3{
   animation:patrol-path-3 15s linear infinite;
 }
 @keyframes patrol-path-3{
-  0%   {left:75%;top:50%}
-  25%  {left:80%;top:46%}
-  50%  {left:85%;top:50%}
-  75%  {left:80%;top:54%}
-  100% {left:75%;top:50%}
+  0%   {left:77%;top:60%}
+  25%  {left:85%;top:57%}
+  50%  {left:93%;top:60%}
+  75%  {left:85%;top:63%}
+  100% {left:77%;top:60%}
+}
+
+/* sprite 方向翻转 — 走"右/下"段时水平镜像（朝右），走"左/上"段时恢复默认（朝左）
+   每个机器人的翻转周期与其 patrol-path-* 周期一致。
+   用 steps(1) 实现瞬时翻面，避免动画过渡时整张图被压扁。 */
+.patrol-robot-1 .patrol-robot-sprite{animation: sprite-walk 2s steps(16) infinite, sprite-flip-14s 14s steps(1) infinite}
+.patrol-robot-2 .patrol-robot-sprite{animation: sprite-walk 2s steps(16) infinite, sprite-flip-16s 16s steps(1) infinite}
+.patrol-robot-3 .patrol-robot-sprite{animation: sprite-walk 2s steps(16) infinite, sprite-flip-15s 15s steps(1) infinite}
+@keyframes sprite-flip-14s{
+  0%   {transform:scaleX(-1)}   /* 0→50% 路径向右，水平翻转朝右 */
+  50%  {transform:scaleX(1)}    /* 50→100% 路径向左，恢复朝左 */
+}
+@keyframes sprite-flip-16s{
+  0%   {transform:scaleX(-1)}
+  50%  {transform:scaleX(1)}
+}
+@keyframes sprite-flip-15s{
+  0%   {transform:scaleX(-1)}
+  50%  {transform:scaleX(1)}
 }
 
 /* ------ plant detail overlay ------ */

@@ -62,18 +62,41 @@
 | 75%  | 43% | 75% |
 | 100% | 38% | 72% |
 
-### 机器人 3 · 右侧（Melaka-Commercial 旁绿地）
+### 机器人 3 · 右侧（Penang-Commercial 旁绿地）
 
 - 循环周期：**15s**
-- 中心：约 `80%, 50%`
+- 中心：约 `85%, 60%`
+- 形状：横向扁椭圆（`rx≈8%` / `ry≈3%`）
 
 | 关键帧 | left | top |
 |--------|------|-----|
-| 0%   | 75% | 50% |
-| 25%  | 80% | 46% |
-| 50%  | 85% | 50% |
-| 75%  | 80% | 54% |
-| 100% | 75% | 50% |
+| 0%   | 77% | 60% |
+| 25%  | 85% | 57% |
+| 50%  | 93% | 60% |
+| 75%  | 85% | 63% |
+| 100% | 77% | 60% |
+
+---
+
+## 三 · 5 朝向翻转（sprite-flip）
+
+精灵图 `Sprite01.png` 默认朝向 **左**（兼容向左 + 向上的路径段）。
+当路径进入 0%→50% 段（左→右方向）时，对 `.patrol-robot-sprite` 应用 `transform: scaleX(-1)` 水平翻转 → 朝右；50%→100% 段恢复默认朝左。
+
+用 `steps(1)` 实现瞬时切换，避免插值过程中图像被压扁：
+
+```css
+.patrol-robot-1 .patrol-robot-sprite{
+  animation: sprite-walk 2s steps(16) infinite,
+             sprite-flip-14s 14s steps(1) infinite;
+}
+@keyframes sprite-flip-14s{
+  0%  {transform:scaleX(-1)}  /* 朝右 */
+  50% {transform:scaleX(1)}   /* 朝左 */
+}
+```
+
+机器人 2 / 3 同理，分别绑定 `sprite-flip-16s` / `sprite-flip-15s`，周期与各自路径一致。
 
 ---
 
